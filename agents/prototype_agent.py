@@ -27,6 +27,7 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
+from agents import prototype_blueprints as blueprints
 from agents.prototype_templates import BASE_CSS, CSS_CLASSES, MAIN_PY, README, fallback_files
 from agents.workflow_state import AgentWorkflowState
 from core.llm import llm_client, AGENT_MAX_TOKENS
@@ -42,6 +43,7 @@ CODE_CALL_MAX_WAIT = 65
 # Smallest answer worth asking for: a shrunk budget only gives a cut-off file.
 CODE_MIN_TOKENS = 4000
 FIX_MIN_TOKENS = 3000
+DESIGN_MIN_TOKENS = 1500
 
 _BLOCK_RE = re.compile(r"(```|~~~)[\w+-]*[ \t]*\n(.*?)(?:\n[ \t]*\1|\Z)", re.DOTALL)
 # Some answers wrap everything in one outer ````markdown fence.
@@ -165,9 +167,46 @@ def parse_files(text: str) -> Dict[str, str]:
     return parse_answer(text)[0]
 
 
+def _parse_json(text: str) -> Any:
+    text = (text or "").strip()
+    try:
+        return json.loads(text)
+    except ValueError:
+        pass
+    start, end = text.find("{"), text.rfind("}")
+    if start >= 0 and end > start:
+        try:
+            return json.loads(re.sub(r",\s*([\]}])", r"\1", text[start:end + 1]))
+        except ValueError:
+            pass
+    return None
+
+
 class PrototypeBuilderAgent:
     def __init__(self):
         self.llm = llm_client
+
+    def _design(self, spec: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], str, bool]:
+        """
+        One small AI call: the app's design as JSON (kind, fields, sample records, rule).
+        Returns (design, error, custom): `custom` means the AI asked for the full-code path.
+        """
+        user = (f"Today is {time.strftime('%Y-%m-%d')}. Design the app for this idea:\n" + json.dumps(spec, indent=1))
+        try:
+            text = self.llm.generate(
+                [{"role": "system", "content": blueprints.DESIGN_PROMPT}, {"role": "user", "content": user}],
+                json_mode=True, max_tokens=AGENT_MAX_TOKENS["prototype_design"], timeout=CODE_CALL_TIMEOUT,
+                max_wait=CODE_CALL_MAX_WAIT, min_answer_tokens=DESIGN_MIN_TOKENS,
+            )
+        except Exception as err:
+            return None, str(err), False
+        raw = _parse_json(text)
+        if isinstance(raw, dict) and str(raw.get("kind", "")).lower().strip() == "custom":
+            return None, "", True
+        try:
+            return blueprints.normalize(raw, spec), "", False
+        except (ValueError, TypeError, KeyError) as err:
+            return None, f"The app design could not be used: {err}", False
 
     # ------------------------------------------------------------ AI calls
 
@@ -285,9 +324,55 @@ class PrototypeBuilderAgent:
             details={"tool": "PRD requirements sorted by priority (no AI)", "requirements": spec["requirements"]},
         )
 
-        # Fixed template files go in first: the generated tests import main.py.
-        sandbox.write_files(proto_id, self._template_files(spec, "written by AI"))
+        # Fixed files go in first: the generated tests import main.py.
+        sandbox.write_files(proto_id, self._template_files(spec, "generated"))
 
+        started = time.time()
+        design, design_error, custom = self._design(spec)
+        mode = "design"
+        if design:
+            files = blueprints.render(design)
+            source, fallback_reason, repaired = "llm", "", False
+            state.add_trace(
+                "Code Writer",
+                f"Generated {len(files)} files ({sum(f.count(chr(10)) for f in files.values())} lines) from the AI's app design",
+                duration_ms=int((time.time() - started) * 1000),
+                output_summary=f"{design['app_name']}: {len(design['fields'])} fields, {len(design['seed'])} sample records",
+                details={"tool": "AI model, 1 call (app design) + code generator", "files": list(files), "design": design},
+            )
+            ok, _, checks = self._check(proto_id, files, state)
+            state.add_trace("Code Fixer", "Not needed: the generated code passed its checks" if ok
+                            else "Not run: failing checks are shown as they are", details={"skipped": True})
+            if checks.get("tests") is None:  # unsafe or not compiling: never run it
+                files, design, fallback_reason = {}, None, "The generated code failed its safety or compile check."
+        elif custom:
+            mode = "full"
+            state.add_trace("Code Writer", "No standard app shape fits this idea; writing the code in full",
+                            duration_ms=int((time.time() - started) * 1000), details={"tool": "AI model, 1 call (app design)"})
+            files, source, fallback_reason, repaired, ok, checks = self._full_code(spec, proto_id, state)
+        else:  # the AI did not answer: a plain app picked from keywords in the idea, labelled as a fallback
+            fallback_reason, source, repaired = design_error, "fallback", False
+            files, checks = {}, {}
+            design = blueprints.default_design(spec)
+            if design:
+                files = blueprints.render(design)
+                state.add_trace("Code Writer", f"AI not available ({design_error[:100]}); generated a plain app from the idea's keywords",
+                                status="warning", duration_ms=int((time.time() - started) * 1000),
+                                details={"tool": "code generator (no AI)", "design": design, "fallback_reason": design_error})
+                ok, _, checks = self._check(proto_id, files, state)
+                if checks.get("tests") is None:
+                    files, design = {}, None
+
+        if not files:  # nothing usable: the built-in MVP planner
+            source = "fallback"
+            files = fallback_files(spec)
+            state.add_trace("Code Writer", "Using the built-in MVP planner prototype instead", status="warning",
+                            details={"fallback_reason": fallback_reason})
+            ok, _, checks = self._check(proto_id, files, state)
+        return self._finish(proto_id, spec, files, source, fallback_reason, repaired, checks, state, mode, design)
+
+    def _full_code(self, spec: Dict[str, Any], proto_id: str, state: AgentWorkflowState):
+        """The AI writes the three files itself (used when no standard app shape fits)."""
         started = time.time()
         files, write_error, missing = self._write_code(spec, proto_id)
         source, fallback_reason, repaired = "llm", "", False
@@ -344,13 +429,11 @@ class PrototypeBuilderAgent:
             fallback_reason = write_error
 
         if fallback_reason:
-            source = "fallback"
-            files = fallback_files(spec)
-            state.add_trace("Code Writer", "Using the built-in MVP planner prototype instead", status="warning",
-                            details={"fallback_reason": fallback_reason})
-            ok, _, checks = self._check(proto_id, files, state)
+            return {}, "fallback", fallback_reason, repaired, False, {}
+        return files, source, fallback_reason, repaired, ok, checks
 
-        all_files = {**files, **self._template_files(spec, "written by AI" if source == "llm" else "built-in fallback")}
+    def _finish(self, proto_id, spec, files, source, fallback_reason, repaired, checks, state, mode, design):
+        all_files = {**files, **self._template_files(spec, "generated" if source == "llm" else "built-in fallback")}
         sandbox.write_files(proto_id, all_files)
         tests = checks.get("tests") or {}
 
@@ -382,10 +465,13 @@ class PrototypeBuilderAgent:
             "generation_source": source,
             "fallback_reason": fallback_reason,
             "repaired": repaired,
+            "build_mode": mode,
+            "app_kind": (design or {}).get("kind", ""),
             "spec": spec,
             "files": [
                 {"path": name, "lines": content.count("\n") + 1,
-                 "written_by": ("ai" if source == "llm" else "fallback") if name in AI_FILES else "template",
+                 "written_by": (("generated" if mode == "design" else "ai") if source == "llm" else "fallback")
+                 if name in AI_FILES else "template",
                  "content": content}
                 for name, content in sorted(all_files.items(), key=lambda kv: (kv[0] not in AI_FILES, kv[0]))
             ],

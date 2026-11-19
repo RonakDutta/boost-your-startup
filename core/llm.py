@@ -64,6 +64,11 @@ AGENT_MAX_TOKENS = {
     # Prototype builder: three small files in one answer, then at most one fix.
     # Reasoning tokens count against these too; with ~1.8k of prompt the code call
     # still fits one model's 8k-per-minute window.
+    # The app design (JSON: kind, fields, sample records, rule) is the normal path;
+    # "prototype" is only used when no standard app shape fits.
+    "prototype_design": 2200,
+    # Failure Simulator: fixes + research notes for up to 5 failure points.
+    "failure_fix": 2600,
     "prototype": 4800,
     "prototype_fix": 4000,
 }

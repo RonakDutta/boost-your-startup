@@ -4,7 +4,7 @@ import { PROTOTYPE_PIPELINE } from '../pipelines.js'
 import RunPanel from '../components/RunPanel.jsx'
 import { More, Tag, plainText, seconds } from '../components/ui.jsx'
 
-const BY = { ai: ['AI', 'info'], fallback: ['Built-in fallback', 'warn'], template: ['Template', ''] }
+const BY = { ai: ['Written by AI', 'info'], generated: ['Generated for this idea', 'info'], fallback: ['Built-in fallback', 'warn'], template: ['Base server file', ''] }
 const RANK = { 'must have': 0, 'should have': 1, 'nice to have': 2 }
 
 function planned(out) {
@@ -150,12 +150,12 @@ function Result({ build, onReview }) {
       <div className="grid g4">
         <div className="card stat"><div className="value">{tests.passed ?? 0}<small>/ {tests.total ?? 0}</small></div><div className="label">Tests passed</div></div>
         <div className="card stat"><div className="value">{answered}<small>/ {called.length}</small></div><div className="label">Endpoints answered</div></div>
-        <div className="card stat"><div className="value">{aiFiles.reduce((n, f) => n + f.lines, 0)}</div><div className="label">Lines written by {build.generation_source === 'llm' ? 'AI' : 'the fallback'}</div></div>
+        <div className="card stat"><div className="value">{aiFiles.reduce((n, f) => n + f.lines, 0)}</div><div className="label">Lines {build.generation_source === 'llm' ? 'generated' : 'from the fallback'}</div></div>
         <div className="card stat"><div className="value">{c.server?.ok ? 'Yes' : 'No'}</div><div className="label">App started</div></div>
       </div>
 
       <div className="row tiny">
-        <Tag tone={build.generation_source === 'llm' ? 'info' : 'warn'}>{build.generation_source === 'llm' ? 'Code written by AI' : 'Built-in fallback prototype'}</Tag>
+        <Tag tone={build.generation_source === 'llm' ? 'info' : 'warn'}>{build.generation_source !== 'llm' ? 'Built-in fallback prototype' : build.build_mode === 'design' ? 'Code generated from your idea' : 'Code written by AI'}</Tag>
         {build.repaired && <Tag tone="accent">AI fixed its own code once after a failed check</Tag>}
         <Tag>Generated prototype, not a finished product</Tag>
         {build.fallback_reason && <span className="muted">Why the fallback: {plainText(build.fallback_reason)}</span>}
@@ -192,6 +192,7 @@ function Result({ build, onReview }) {
         <div className="row between">
           <h3>Code</h3>
           <div className="row">
+            <button className="btn sm" onClick={() => window.dispatchEvent(new CustomEvent('copilot:failure', { detail: { path: build.path } }))}>Check for failure points</button>
             <button className="btn sm" onClick={() => onReview(build)}>Review with Codebase Evaluation</button>
             <a className="btn sm" href={`/api/prototype/${build.id}/download`}>Download zip</a>
           </div>
@@ -232,7 +233,7 @@ export default function Prototype({ out, sessionId, protoRun }) {
           <div className="eyebrow accent">Prototype Builder</div>
           <h2 className="display">Turn this idea into a small working app</h2>
           <p style={{ margin: 0, color: 'var(--ink-2)', maxWidth: 640 }}>
-            The AI writes a tiny FastAPI app with one web page for the top requirements. Then code checks it, runs its tests, starts it on this computer and keeps an eye on it.
+            The AI designs a tiny FastAPI app with one web page for the top requirements and the code is generated from it. Then code checks it, runs its tests, starts it on this computer and keeps an eye on it.
           </p>
           {features.length > 0 && (
             <div className="stack" style={{ gap: 6 }}>
@@ -242,7 +243,7 @@ export default function Prototype({ out, sessionId, protoRun }) {
           )}
           <div className="row">
             <button className="btn primary" onClick={() => start({ session_id: sessionId })}>Build prototype</button>
-            <span className="tiny muted">About 30 to 60 seconds · 1 or 2 AI calls · runs only on this computer</span>
+            <span className="tiny muted">About 10 to 30 seconds · usually 1 AI call · runs only on this computer</span>
           </div>
         </div>
       )}

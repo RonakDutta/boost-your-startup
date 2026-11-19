@@ -40,7 +40,7 @@ async def _lifespan(_app):
 
 
 app = FastAPI(
-    title="Agentic AI Co-Pilot API",
+    title="Boost Your Startup API",
     description="Multi-Agent RAG System for Idea Validation and Codebase Analysis",
     version="1.0.0",
     lifespan=_lifespan,
@@ -52,6 +52,8 @@ HTML_PATH = ROOT_DIR / "web" / "templates" / "index.html"
 # UI=legacy in the environment keeps the old single-file dashboard at /.
 UI_DIST = ROOT_DIR / "web" / "react-app" / "dist"
 SAMPLE_REPO_PATH = ROOT_DIR / "sample_repo"
+# Demo repo for the Failure Simulator: a small made-up startup backend with real failure points.
+SAMPLE_STARTUP_REPO_PATH = ROOT_DIR / "sample_startup_repo"
 
 
 # Every visitor shares one free Groq key, so full pipeline runs are limited per
@@ -91,7 +93,8 @@ def _local_path_allowed(path: str) -> bool:
         return True
     target = os.path.realpath(path)
     allowed = [os.path.realpath(r) for r in roots] + [
-        os.path.realpath(SAMPLE_REPO_PATH), os.path.realpath(prototype_sandbox.PROTOTYPE_DIR),
+        os.path.realpath(SAMPLE_REPO_PATH), os.path.realpath(SAMPLE_STARTUP_REPO_PATH),
+        os.path.realpath(prototype_sandbox.PROTOTYPE_DIR),
     ]
     return any(target == root or target.startswith(root + os.sep) for root in allowed)
 
@@ -433,10 +436,22 @@ def inspect_repository(req: InspectRepoRequest):
         )
 
 
+@app.get("/api/startup-failure-data")
+def startup_failure_data(verify: bool = False):
+    """Why startups fail (CB Insights survey data with its source). verify=1 re-checks the live report page."""
+    from tools import startup_failure_data as failure_data
+
+    body = dict(failure_data.load())
+    if verify:
+        body["verification"] = failure_data.verify_live()
+    return JSONResponse(content=body)
+
+
 @app.get("/api/sample-repo-path")
 def get_sample_repo_path():
     """Returns the normalized absolute path to the built-in sample demo repository."""
-    return JSONResponse(content={"path": str(SAMPLE_REPO_PATH).replace("\\", "/")})
+    return JSONResponse(content={"path": str(SAMPLE_REPO_PATH).replace("\\", "/"),
+                                 "startup_path": str(SAMPLE_STARTUP_REPO_PATH).replace("\\", "/")})
 
 
 @app.get("/health")
@@ -531,5 +546,5 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "8000"))
     reload_enabled = os.getenv("RELOAD", "1") not in ("0", "false", "False")
-    print(f"\n[Agentic Co-Pilot] Running at: http://localhost:{port} (http://127.0.0.1:{port})\n")
+    print(f"\n[Boost Your Startup] Running at: http://localhost:{port} (http://127.0.0.1:{port})\n")
     uvicorn.run("app:app", host=host, port=port, reload=reload_enabled)

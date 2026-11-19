@@ -1,4 +1,6 @@
-import { Bar, More, SafeLink, Source, Tag, downloadText } from '../components/ui.jsx'
+import { useState } from 'react'
+import { Bar, More, SafeLink, Source, Tag, downloadText, useScrollTo } from '../components/ui.jsx'
+import { Columns, HBars, SplitBar, yearColumns } from '../components/charts.jsx'
 
 const SOURCE_NAMES = { arxiv: 'arXiv', semantic_scholar: 'Semantic Scholar', openalex: 'OpenAlex' }
 const sourceName = (s) => SOURCE_NAMES[s] || s
@@ -123,17 +125,22 @@ export function Spotlight({ pa }) {
   )
 }
 
-function PaperList({ papers }) {
+function PaperList({ papers, picked }) {
+  useScrollTo(`paper-${picked?.ref}`, !!picked)
   return (
     <div className="card pad">
       {papers.map((p) => (
-        <div className="paper" key={p.ref_id}>
+        <div className={`paper ${picked?.ref === p.ref_id ? 'picked' : ''}`} key={p.ref_id} id={`paper-${p.ref_id}`}>
           <span className="ref">{p.ref_id}</span>
           <div style={{ minWidth: 0 }}>
             <SafeLink href={p.url} className="paper-title">{p.title}</SafeLink>
             <div className="tiny muted">{authors(p.authors)} · {p.year || 'n.d.'} · {[p.source, ...(p.also_found_in || [])].map(sourceName).join(', ')}</div>
             <PaperLinks p={p} />
-            {p.abstract && <More label="Abstract"><p className="small muted" style={{ margin: 0 }}>{p.abstract}</p></More>}
+            {p.abstract && (
+              <More key={picked?.ref === p.ref_id ? picked.n : 'closed'} label="Abstract" open={picked?.ref === p.ref_id}>
+                <p className="small muted" style={{ margin: 0 }}>{p.abstract}</p>
+              </More>
+            )}
           </div>
           <div className="sim">
             <div className="row between tiny"><span className="muted">similarity</span><span className="mono">{p.similarity.toFixed(2)}</span></div>
@@ -160,6 +167,13 @@ function Comparisons({ pa }) {
             · {v.citations_removed || 0} wrong citations removed · {Math.round((v.avg_abstract_support || 0) * 100)}% backed by abstracts
           </span>
         )}
+      </div>
+      <div className="card pad">
+        <div className="small muted" style={{ marginBottom: 8 }}>Overlap with your idea, paper by paper</div>
+        <SplitBar parts={['high', 'medium', 'low'].map((lvl) => ({
+          label: `${lvl[0].toUpperCase()}${lvl.slice(1)} overlap`, value: (pa.comparisons || []).filter((c) => c.overlap_level === lvl).length,
+          tone: lvl === 'high' ? 'risk' : lvl === 'medium' ? 'warn' : 'good',
+        }))} unit=" papers" />
       </div>
       <div className="grid g2">
         {(pa.comparisons || []).map((c) => (
@@ -198,6 +212,7 @@ export default function Papers({ pa, title }) {
       </div>
     )
   }
+  const [picked, setPicked] = useState(null)
   const slug = (title || 'idea').toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 40)
   return (
     <div className="stack-lg">
@@ -219,9 +234,23 @@ export default function Papers({ pa, title }) {
           <SimilarityMap points={pa.similarity_map} papers={papers} />
         </div>
       </div>
+      <div className="grid g2">
+        <div className="card pad stack">
+          <div className="row between"><h3>How close each paper is</h3><span className="tiny muted">similarity to your idea ({pa.similarity_backend?.startsWith('MiniLM') ? 'MiniLM' : 'TF-IDF'})</span></div>
+          <HBars labelWidth={250} unit="%" onPick={(r) => setPicked({ ref: r.key, n: Date.now() })} rows={papers.map((p) => ({
+            key: p.ref_id, label: `${p.ref_id} · ${p.title}`, sub: `${p.year || 'n.d.'} · ${sourceName(p.source)}`,
+            value: Math.round(p.similarity * 100), tone: 'info', tip: `${p.ref_id}: ${p.title} (${Math.round(p.similarity * 100)}%). Click to open it`,
+          }))} />
+        </div>
+        <div className="card pad stack">
+          <div className="row between"><h3>When they were published</h3><span className="tiny muted">is the topic active?</span></div>
+          <Columns data={yearColumns(papers)} height={150} />
+          <div className="tiny muted">{papers.filter((p) => p.year && p.year >= new Date().getFullYear() - 3).length} of {papers.length} papers are from the last 3 years.</div>
+        </div>
+      </div>
       <div className="stack">
         <h3>All papers we compared against</h3>
-        <PaperList papers={papers} />
+        <PaperList papers={papers} picked={picked} />
       </div>
       {(pa.comparisons || []).length > 0 && <Comparisons pa={pa} />}
       {(pa.research_gap || pa.positioning) && (

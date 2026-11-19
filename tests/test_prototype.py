@@ -11,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agents import prototype_agent
+from agents import prototype_blueprints as blueprints
 from agents.prototype_agent import build_spec, parse_files, prototype_builder
 from agents.prototype_templates import fallback_files
 from agents.workflow_state import AgentWorkflowState
@@ -97,10 +98,18 @@ def sandbox_dir(tmp_path, monkeypatch):
     prototype_sandbox.processes.stop_all()
 
 
-def build_with(monkeypatch, replies):
+CUSTOM = '{"kind": "custom"}'
+
+
+def build_with(monkeypatch, replies, design=CUSTOM, idea=None):
+    """`replies` answer the code calls in order; `design` answers the app-design call (not counted in calls)."""
     calls = []
 
     def fake_generate(messages, *args, **kwargs):
+        if messages[0]["content"] == blueprints.DESIGN_PROMPT:
+            if isinstance(design, Exception):
+                raise design
+            return design
         calls.append(messages)
         reply = replies[min(len(calls), len(replies)) - 1]
         if isinstance(reply, Exception):
@@ -110,7 +119,7 @@ def build_with(monkeypatch, replies):
     monkeypatch.setattr(llm_client, "generate", fake_generate)
     steps = []
     state = AgentWorkflowState(session_id="t", user_query="t", listener=steps.append)
-    return prototype_builder.build(IDEA, state), steps, calls
+    return prototype_builder.build(idea or IDEA, state), steps, calls
 
 
 def test_spec_picks_must_have_first():
@@ -193,7 +202,7 @@ def test_api_build_stream_monitor_stop_and_download(monkeypatch):
 
     session = session_manager.get_or_create_session("proto01")
     session.active_entities["final_output"] = IDEA
-    monkeypatch.setattr(llm_client, "generate", lambda *a, **k: answer())
+    monkeypatch.setattr(llm_client, "generate", lambda m, *a, **k: CUSTOM if m[0]["content"] == blueprints.DESIGN_PROMPT else answer())
     client = TestClient(app)
 
     assert client.post("/api/prototype/build/stream", json={"session_id": "nosuch"}).status_code == 404
@@ -294,3 +303,74 @@ def test_wait_covers_enough_bookings_for_a_big_call():
         client._ledger._window[model] = collections.deque([[now - 50, 2000.0], [now - 30, 2000.0], [now - 10, 2000.0]])
     wait = client._ledger_wait(model, 5400)  # needs two bookings to leave: the 30s-old one leaves in ~30s
     assert 29 < wait < 32
+
+
+# ------------------------------------------------------------ app designs (the normal path)
+
+TRACTOR_DESIGN = json.dumps({
+    "kind": "booking", "app_name": "Tractor Share", "tagline": "Book a tractor by the slot",
+    "entity": "Booking", "entity_plural": "Bookings", "action": "Book tractor",
+    "fields": [{"name": "farmer", "label": "Farmer", "type": "text"},
+               {"name": "tractor", "label": "Tractor", "type": "choice", "choices": ["Mahindra 575", "Swaraj 744"]},
+               {"name": "day", "label": "Day", "type": "date"},
+               {"name": "slot", "label": "Slot", "type": "choice", "choices": ["06:00", "10:00", "14:00"]}],
+    "seed": [{"farmer": "Ramesh Yadav", "tractor": "Mahindra 575", "day": "2026-11-18", "slot": "06:00"},
+             {"farmer": "Sunita Devi", "tractor": "Swaraj 744", "day": "2026-11-18", "slot": "06:00"},
+             {"farmer": "Mohan Patil", "tractor": "Mahindra 575", "day": "2026-11-18", "slot": "06:00"}],  # double booking: dropped
+    "rule": {"resource_field": "tractor", "day_field": "day", "slot_field": "slot"},
+})
+
+
+def test_design_build_uses_one_small_call_and_passes_its_tests(monkeypatch):
+    build, steps, calls = build_with(monkeypatch, [], design=TRACTOR_DESIGN)
+    assert calls == []  # only the design call, no code-writing call
+    assert build["generation_source"] == "llm" and build["build_mode"] == "design" and build["app_kind"] == "booking"
+    assert build["checks"]["tests"]["ok"] and build["checks"]["tests"]["passed"] >= 7
+    assert build["checks"]["page_ok"] and build["checks"]["server"]["ok"]
+    by = {f["path"]: f["written_by"] for f in build["files"]}
+    assert by["features.py"] == "generated" and by["main.py"] == "template"
+    code = next(f["content"] for f in build["files"] if f["path"] == "features.py")
+    assert "Mahindra 575" in code and "Mohan Patil" not in code
+    assert any(s["agent_name"] == "Code Fixer" and s["details"].get("skipped") for s in steps)
+
+
+def test_ai_down_builds_a_labelled_app_from_the_idea_keywords(monkeypatch):
+    build, steps, calls = build_with(monkeypatch, [], design=RuntimeError("Engine busy"))
+    assert build["generation_source"] == "fallback" and build["app_kind"] == "booking"
+    assert "Engine busy" in build["fallback_reason"] and build["checks"]["tests"]["ok"]
+    assert any(s["agent_name"] == "Code Writer" and s["status"] == "warning" for s in steps)
+
+
+@pytest.mark.parametrize("idea, kind", [
+    ("A smart ultrasonic water meter for residential buildings using LoRaWAN to detect pipe leakages in real time "
+     "and estimate daily household consumption.", "monitor"),
+    ("An automated AI peer review platform for engineering students that checks their lab code submissions for "
+     "code quality, linting and AST-based standards.", "review"),
+    ("A low-cost IoT energy auditing system for residential societies that detects abnormal power spikes using "
+     "ESP32 with CT current sensors and alerts residents.", "monitor"),
+    ("Hostel students raise complaints and track their status", "tracker"),
+])
+def test_demo_ideas_get_a_working_app_without_ai(idea, kind):
+    design = blueprints.default_design({"title": "Demo", "problem": idea})
+    assert design["kind"] == kind
+    files = blueprints.render(design)
+    assert prototype_sandbox.safety_check(files) == [] and prototype_sandbox.compile_check(files) == []
+    assert prototype_sandbox.page_api_check(files) == []
+    from agents.prototype_templates import BASE_CSS, MAIN_PY
+    prototype_sandbox.write_files("abcdef1234", {**files, "main.py": MAIN_PY.format(title="Demo"), "static/base.css": BASE_CSS})
+    tests = prototype_sandbox.run_tests("abcdef1234")
+    assert tests["ok"] and tests["passed"] >= 7, tests["output"]
+
+
+def test_messy_designs_are_cleaned_or_rejected():
+    spec = {"title": "T"}
+    with pytest.raises(ValueError):
+        blueprints.normalize({"kind": "custom"}, spec)
+    with pytest.raises(ValueError):
+        blueprints.normalize("not a dict", spec)
+    d = blueprints.normalize({"kind": "review", "fields": [{"name": "status", "type": "text"}],
+                              "rule": {"checks": [{"kind": "contains", "value": "x"}, {"kind": "not_contains", "value": "X"},
+                                                  {"kind": "regex", "value": ".*"}]}}, spec)
+    assert [c["kind"] for c in d["rule"]["checks"]] == ["contains"]  # opposite and unknown checks dropped
+    assert d["fields"][0]["name"] == "status_value" and any(f["type"] == "long_text" for f in d["fields"])
+    assert len(d["seed"]) >= 3

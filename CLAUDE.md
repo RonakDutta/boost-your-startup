@@ -12,8 +12,9 @@ Guide for Claude (and other coding agents) working on this repo. Read it fully b
 |---|---|---|
 | **Startup Assistance** | `idea_validation` | Checks an idea against the web, **real research papers**, and a devil's advocate; scores it with a fixed rubric; writes a PRD, diagrams and a roadmap. The **Prototype Builder** (Prototype tab) then codes a tiny FastAPI + HTML app from the PRD, tests it, runs it and monitors it. |
 | **Codebase Evaluation** | `codebase_analysis` | Reads a Python repo (local path or GitHub URL), finds the code behind a bug or question, shows what a change would break, and has a critic verify every answer against the real files. Read-only. |
+| **Failure Simulator** | `failure_analysis` (only via `force_intent`) | Finds failure points in a Python repo with 11 fixed checks (each a CWE type), shows which entry points each failure reaches (call graph) with a short scenario, links each kind of failure to **live research papers**, and suggests fixes that a code critic checks. Read-only. |
 
-The user's goal: **impress teachers in a viva**. That only works if everything shown is real and checkable, so honesty is a hard rule (section 2).
+The user's goal: **impress teachers in a viva**. The teachers care mostly about research, so **from Nov 2026 the direction is "less tech, more research"**: keep features modest, and make every feature show its research basis (papers found live, CWE, the literature table on the landing page). That only works if everything shown is real and checkable, so honesty is a hard rule (section 2).
 
 ---
 
@@ -29,7 +30,7 @@ The user's goal: **impress teachers in a viva**. That only works if everything s
 - No pill shapes, no status dots, no pulsing or animated effects, no gradients, no uppercase letter-spaced labels, no fancy or serif display fonts, no arrows in buttons, no glow/shadows. Flat, square-ish corners (4-6px). Fonts: the computer's own system font (Segoe UI / San Francisco / Roboto) and system mono (Consolas / Menlo) for code only. The user rejected Inter and the bundled web fonts as "Claude-style"; do not add web fonts back.
 - **Less text.** The teacher did not read long pages last time. Numbers and short labels first; details behind "Show more" / "How is this computed?".
 - **Language:** easy to read but not childish. Keep a few real terms (AST, embeddings, call graph, novelty index) with a short explanation; no heavy jargon or buzzwords; no em dashes in user-facing text.
-- **Do not show that the app uses an external API.** No "Groq", "free tier", "free tokens", "API key" or rate-limit wording in the new UI. Use neutral wording ("Engine ready", "AI model", "Engine busy"). Model ids are shown without the provider prefix (`modelName()` in `ui.jsx`); backend step text goes through `plainText()`.
+- **Do not show that the app uses an external API.** No "Groq", "free tier", "free tokens", "API key" or rate-limit wording in the new UI. Use neutral wording ("AI engine", "AI model", "busy"). Engine state is only shown as a corner toast when something is wrong, never as a header line. Model ids are shown without the provider prefix (`modelName()` in `ui.jsx`); backend step text goes through `plainText()`.
 
 **Process**
 - Push finished work to the session branch quickly, and record it in this file (Status + Backlog).
@@ -42,7 +43,7 @@ The user's goal: **impress teachers in a viva**. That only works if everything s
 ```bash
 pip install -r requirements.txt
 python app.py                                   # http://127.0.0.1:8000  (new UI at /, old UI at /legacy)
-GROQ_API_KEY= pytest -q                         # 122 pass, 3 live smoke tests skip without a key
+GROQ_API_KEY= pytest -q                         # 141 pass, 3 live smoke tests skip without a key
 python evaluation/compare_baseline.py           # naive vs AST chunking (computed)
 python evaluation/retrieval_benchmark.py        # BM25 / vector / hybrid Top-1, Top-3, MRR
 python evaluation/free_tier_budget.py           # token plan vs the model limits (no quota used)
@@ -75,7 +76,10 @@ Idea brief ─┬─ Market search (web) ── Devil's advocate ── Judge �
   → Critic (no AI: file, symbol, lines, retrieved, quote-vs-disk, fix compiles) → at most one revision
 ```
 
-### Prototype Builder (`agents/prototype_agent.py` + `tools/prototype_sandbox.py`)
+### Prototype Builder (`agents/prototype_agent.py` + `agents/prototype_blueprints.py` + `tools/prototype_sandbox.py`)
+**Normal path (Phase 8):** the AI makes ONE small JSON "app design" call (`DESIGN_PROMPT`, ~2.2k max tokens): kind (`monitor` readings per group with spike/threshold flags, `review` text/code scored against checks, `tracker` statuses, `booking` slots with no double booking), fields, 3-12 sample records and the rule. `blueprints.normalize()` cleans it (field names, limits, conflicting checks, double-booked seeds) and `blueprints.render()` generates features.py, index.html and test_features.py (7-9 tests that pass by construction). No Code Fixer call is needed. AI down → `default_design()` picks a kind from keywords in the idea (the 3 demo ideas: water meter and energy → monitor, AI code reviewer → review), labelled fallback. AI answers `"kind": "custom"` → the old full-code path below. **The UI never says "template"**: files show "Generated for this idea" (`written_by: generated`), main.py shows "Base server file" (user's choice, Nov 2026).
+
+Full-code path (only for "custom"):
 ```
 PRD (session) → Spec Planner (top 3 requirements, code) → Code Writer (1 AI call: features.py, static/index.html, test_features.py)
   → Safety Check (AST import allowlist, no eval/exec/open/dunders, no outside scripts) → Compiler → Page Check (page /api paths vs routes) → Test Runner (pytest subprocess)
@@ -87,6 +91,21 @@ PRD (session) → Spec Planner (top 3 requirements, code) → Code Writer (1 AI 
 - Monitor = the prototype's own `requests.log`; requests from the builder's checks carry `X-Prototype-Check` and are counted apart from people.
 - Budget: `prototype` 4800 max tokens (reasoning tokens count too), `prototype_fix` 4000; both fit one model's 8k/minute. Calls use `min_answer_tokens` (never shrunk below 4000/3000: a shrunk code answer is cut off; it waits up to 65 s for a window instead), `use_cache=False` (Build again = new code) and `timeout=90`. Cut-off answers (`finish_reason == "length"`) are never cached anywhere.
 - A file missing or cut off in the answer goes to the Code Fixer (asked for just that file), not straight to the fallback. `runtime_check()` fails the build with a clear pip message if fastapi/uvicorn/pytest/httpx cannot be imported in the sandbox env (site-packages dirs are passed via PYTHONPATH so `pip install --user` setups work).
+
+### Failure Simulator (`agents/failure_agent.py` + `tools/failure_checks.py`)
+```
+(clone if GitHub URL) → AST index → Failure Scanner (11 AST checks, CWE each, test files skipped, secrets masked)
+  → Failure Spread (ChangeImpactAgent callers + entry points; scenario text from a per-type template, no AI)
+  → Failure Research (top 5 failure types: 2 queries each on arXiv/S2/OpenAlex; keep a paper only if it names the
+    failure (`must` word patterns); rank by MiniLM/TF-IDF similarity to the type's topic; key sentence = abstract
+    sentence with most topic words)
+  → Fix Advisor (1 AI call, `failure_fix` 2.6k tokens, one failure point per type, max 5; papers given as [R1..R3])
+  → Fix Critic (fix parses, the same check no longer fires on it, [R] citations must be retrieved papers, abstract
+    support ratio; a research note without a valid citation is dropped)
+```
+- Readiness = 100 - 8 per high, 4 per medium, 1 per low, each kind counted at most twice (computed in code). The demo repo `sample_startup_repo/` (CampusEats, made up) has 12 planted failure points of 9 kinds and scores 31.
+- No AI: standard fix per type + "closest paper" note from the abstract, labelled fallback. `failure_simulator.research_enabled` overrides `PRIOR_ART_ENABLED` (tests).
+- Started from the Prototype tab too ("Check for failure points", `copilot:failure` event). Route `#/app/failure`.
 
 ### API (FastAPI, `app.py`)
 | Endpoint | Purpose |
@@ -104,7 +123,8 @@ PRD (session) → Spec Planner (top 3 requirements, code) → Code Writer (1 AI 
 ### `final_output` data contract (what the UI reads)
 - **Idea:** `project_title`, `problem_statement`, `core_value_prop`, `target_personas`, `mvp_features`, `competitors[]`, `tech_stack{layer: {choice, rationale, tradeoffs}}`, `citations[] (is_live)`, `scorecard{total_score, verdict, verdict_summary, categories[], evidence_confidence, ...}`, `kill_report{fatal_flaws[], bear_case_summary, ...}`, `reconciliation{verdict, must_have_mitigations, key_tradeoffs}`, `prd{product_vision, user_stories, functional_requirements, *_diagram_mermaid}`, `phases[]`, `risks[]`, **`prior_art`** (below), `provenance{section: llm|fallback|deterministic}`, `sections_13` (14 entries when prior art ran), `full_report_markdown`.
 - **`prior_art`:** `papers[]{ref_id, title, authors, year, venue, abstract, url, pdf_url, doi, source, also_found_in, citation_count, similarity}`, `novelty_index`, `novelty_band`, `closest_similarity`, `evidence_confidence`, `similarity_backend`, `search_backend`, `queries`, `comparisons[]{ref, what_it_does, overlap, paper_is_stronger_at, idea_adds, overlap_level, abstract_support}`, `research_gap`, `positioning`, `related_work`, `ieee_references[]`, `bibtex`, `similarity_map[]{label, x, y, is_idea, similarity}`, `verification{comparisons_kept, invalid_refs_dropped, citations_removed, avg_abstract_support}`, `notes[]`, `generation_source`.
-- **Prototype build:** `id`, `title`, `path`, `generation_source`, `fallback_reason`, `repaired`, `spec{requirements[]}`, `files[]{path, lines, written_by: ai|fallback|template, content}`, `checks{safety_ok, compile_ok, tests{ok, passed, failed, errors, total, output, duration_ms}, server{ok, url, port, ms, error}, endpoints[]{method, path, status|null, ms}}`. Monitor status: `state (running|crashed|stopped)`, `url`, `uptime_s`, `auto_stop_in_s`, `requests_visitors`, `requests_checks`, `server_errors`, `client_errors`, `avg_ms`, `recent[]`, `recent_errors[]`, `server_log[]`.
+- **Prototype build:** `id`, `title`, `path`, `generation_source`, `fallback_reason`, `repaired`, `build_mode (design|full)`, `app_kind`, `spec{requirements[]}`, `files[]{path, lines, written_by: generated|ai|fallback|template, content}`, `checks{safety_ok, compile_ok, tests{ok, passed, failed, errors, total, output, duration_ms}, server{ok, url, port, ms, error}, endpoints[]{method, path, status|null, ms}}`. Monitor status: `state (running|crashed|stopped)`, `url`, `uptime_s`, `auto_stop_in_s`, `requests_visitors`, `requests_checks`, `server_errors`, `client_errors`, `avg_ms`, `recent[]`, `recent_errors[]`, `server_log[]`.
+- **Failure:** `type: failure_analysis`, `summary`, `readiness{score, band, formula, penalties[]}`, `counts{high, medium, low, total, files_scanned}`, `failure_types[]{type, title, cwe, cwe_name, cwe_url, severity, why, fix, count}`, `findings[]{id, type, title, severity, cwe, file_path, line, symbol, code_line, context_start, context_code, callers[], entrypoints[], scenario}`, `research[]{type, title, queries, papers[]{ref, title, authors, year, venue, url, pdf_url, doi, source, similarity, abstract, key_sentence, ieee}, dropped}`, `fixes[]{id, what_can_go_wrong, fixed_code, fix_hint, research_note, cited_refs, generated_by, checks{compiles, failure_gone, citations_valid, abstract_support}}`, `verification`, `notes`, `generation_source`, `provenance`.
 - **Code:** `summary`, `question_mode`, `candidates[]{rank, file_path, symbol_name, line_start, line_end, confidence, why_problematic, wrong_code, recommended_pattern, explanation_of_change, generated_by, verification{file_exists, symbol_exists, lines_in_bounds, in_retrieved_evidence, quote_matches_disk, fix_compiles}}`, `critic{grounding_score, is_valid, total_checked, total_verified, code_quote_matches, fixes_compiling, fixes_checked, flags}`, `impact{target_symbol, risk_level, blast_radius_score, direct_callers[], indirect_callers[], affected_tests, affected_entrypoints, mermaid_diagram, recommendations}`, `flow{hops[]}`, `retrieved_locations[]`, `indexed_summary`, `retrieval_backend`, `local_repo_path`.
 
 ---
@@ -123,16 +143,19 @@ PRD (session) → Spec Planner (top 3 requirements, code) → Code Writer (1 AI 
 - `agents/idea_agent.py`, `market_agent.py`, `kill_agent.py` (+ reconciler), `prd_agent.py`, `roadmap_agent.py`: idea track. Every result has `generation_source` + `fallback_reason`.
 - `agents/conversation_session.py`: follow-up engine, `SessionManager` (LRU + TTL + SQLite).
 - `agents/prototype_agent.py` (builder + prompts), `agents/prototype_templates.py` (main.py, base.css, fallback app), `tools/prototype_sandbox.py` (safety check, compile, pytest, process manager, monitor, zip).
+- `agents/failure_agent.py` (Failure Simulator pipeline), `tools/failure_checks.py` (checks, CWE catalogue with research queries, readiness, fix check), `sample_startup_repo/` (demo repo with planted failure points; do not "fix" it).
 - `indexer/`: `ast_parser.py`, `bm25_search.py`, `vector_search.py` (MiniLM once per process), `hybrid_retriever.py`, `index_cache.py`, `github_ingest.py`.
 - `tools/search_tool.py`: Tavily → `ddgs` → DDG Instant Answer → labelled offline references.
 
 **New UI (`web/react-app/src`, React 18 + Vite, no Tailwind, system fonts, no web fonts)**
 - `Landing.jsx`: start page at `/` (project sheet, two tools, the real pipeline graphs, chatbot comparison table). "Open the app" goes to `#/app` (or `#/app/code`); clicking the name in the app header goes back. Keep its facts true when the pipeline changes.
-- `App.jsx`: header (pillar switch, engine status, theme toggle), `StartupPage`, `CodePage`, "Why not just ask a chatbot?" cards. Both pages stay mounted so a run survives switching. `useRun.js`: SSE run state (`useRun(url)`, also used for prototype builds).
+- `App.jsx`: header (project name, three plain text tabs with an accent underline, theme toggle; no logo mark, no engine line: user, Nov 2026). `EngineToast` shows a small dismissable note in the corner only when the server is offline, the AI engine is off, or it is busy (closed state kept per browser session). `StartupPage`, `CodePage`, "Why not just ask a chatbot?" cards. Both pages stay mounted so a run survives switching. `useRun.js`: SSE run state (`useRun(url)`, also used for prototype builds).
 - `api.js`: `streamRun()` (fetch + SSE parser), `getJSON`, `postJSON`.
 - `pipelines.js`: graph definitions matched to trace `agent_name`s; `nodeStates()` derives done / working / fallback from real events and the dependency graph.
+- `components/charts.jsx`: flat charts with a hover readout, theme colours only (works in dark mode): `HBars` (incl. stacked `parts` + `legend`), `SplitBar`, `Columns`, `yearColumns()`, `Timeline`, `FlowGraph` (columns of nodes + edges, hover highlights a path). Used by the Failure Simulator (points split, kinds, files, spread graph, research results, years, fix checks), Research papers tab (similarity per paper, papers per year, overlap split) and Plan tab (roadmap timeline). Follow the dataviz rules: thin bars (14px), 4px rounded ends, 2px gaps in stacks, legend for 2+ series, text never in the data colour, no rings/gauges, details in "Table view".
 - `components/`: `PipelineGraph` (SVG agent graph), `RunPanel` (live graph + step log + AI calls), `TraceView` ("How it ran" tab), `FollowUp`, `ui.jsx` (Tag, Source, Bar, Score, More, Markdown via marked + DOMPurify, Mermaid lazy-loaded with `securityLevel: 'strict'`, `modelName`, `plainText`).
 - `startup/StartupResult.jsx` (tabs: Overview, Research papers, Scorecard, Market, Risks, Plan, Prototype, How it ran), `startup/Prototype.jsx` (live build graph, stats, live preview iframe, monitor polled every 2 s, checks, code viewer, zip, "Review with Codebase Evaluation" via a `copilot:review` window event), `startup/Papers.jsx` (spotlight, novelty, similarity map, paper list, comparisons, gap/positioning, Related Work, BibTeX).
+- `failure/FailureResult.jsx` (tabs: Overview with readiness and CWE table, Failure points with "If it fails" and callers, Research with papers per failure type, Fixes with checks and before/after, How it ran). `FailurePage` lives in `App.jsx`.
 - `code/CodeResult.jsx` (tabs: Overview, Findings with verification checks and before/after code, Impact, How it ran).
 - `styles.css`: design tokens (light default, dark via `data-theme`), flat components. Palette: grey background, blue accent (changed from beige/orange so it reads less like an AI product).
 - Legacy UI: `web/templates/index.html` (kept at `/legacy`, not developed further).
@@ -203,6 +226,37 @@ Grounded prompts, deterministic critic with quote-vs-disk and compile checks, ho
 - Fallback idea title from the idea text ("Split Shared Grocery Bills", not "A Mobile App That"); Research papers tab says "Not checked" when the comparison fell back.
 - Landing page uses the mid-term report: course ARP-455, student, guide, session, research gap (report 3.1), "Built on this research" with arXiv links (ids checked against arxiv.org).
 
+### Phase 8: prototype app designs (branch `claude/pensive-darwin-8pzpug`)
+- Prototype Builder now asks the AI for a short JSON app design instead of three code files (see section 4). One call of at most 2.2k tokens instead of 4.8k + 4k; the generated tests pass by construction.
+- Without the AI, the three demo ideas still get a fitting app (water meter / energy: readings per flat with spike alerts; AI code reviewer: submissions scored on docstring, print, bare except, line length, length), labelled fallback. Checked in Chromium (screenshots of all three).
+- Each prototype gets its own look: 7 colour themes x 3 layouts (dashboard, sidebar, banner) x 3 headers, all flat, via `data-theme/-layout/-header` on `<body>` and CSS variables in `base.css`. The AI picks it in the design (`look`); otherwise colour comes from words in the idea (water teal, energy amber, code indigo, farming green, health rose, complaints slate) and layout/header follow the colour, so the 3 demo ideas always look different. Downloading outside templates was considered and rejected: the page CSP blocks outside files, the demo must work offline, and licences.
+- UI wording: "Code generated from your idea", "Generated for this idea", "Base server file"; no "template" on screen.
+- Tests: 129 pass (`tests/test_prototype.py`: design path, AI-down keyword path, the 3 demo ideas + a tracker run their own generated tests, messy designs cleaned or rejected).
+- **Not yet checked with a real key:** run the 3 demo ideas on the laptop and look at the AI's design (names, sample data).
+
+### Phase 9: Failure Simulator + research focus (same branch)
+- New third tool (see section 4). Header: Startup Assistance · Codebase Evaluation · Failure Simulator. Prototype stays a tab inside Startup Assistance (it needs the idea run); it has a "Check for failure points" button.
+- Landing page: three tools, the Failure Simulator graph, two facts rows, a comparison row, and two verified sources in "Built on this research": Yuan et al., OSDI 2014 ("Simple Testing Can Prevent Most Critical Failures", USENIX link opened and checked) and MITRE CWE.
+- Checked in Chromium on the demo repo without a key: 12 failure points, 15 live arXiv papers on 5 failure types, standard fixes labelled fallback; no sideways scroll at 390px.
+- Tests: 135 pass (`tests/test_failure.py`: each check fires and its safe version does not, readiness cap, fix check, demo repo end to end with stubbed search, AI fixes checked by the critic, SSE endpoint).
+- **Not yet checked with a real key:** the Fix Advisor's AI fixes and research notes. Run the demo repo on the laptop.
+
+### Phase 10: charts instead of text (same branch)
+- User: "use more graphs, it is a lot of text". Added `components/charts.jsx` and replaced text blocks with charts (see section 5). Tables moved behind "Table view". Checked in Chromium, light and dark, no sideways scroll at 390px.
+- Click-through ("click a chart item, land on it"): in the Failure Simulator, a kind bar, file bar or spread-graph box opens Failure points filtered to it (`focus {by: type|func|file|entry}` + "Show all" bar); research bars and "Research on this" scroll to and mark that kind's papers; "See the fix" marks the fix; "N found in your code" goes back. On the Research papers tab a paper's bar scrolls to it, marks it and opens its abstract. Marked items use the static `.picked` style (accent edge, no animation); `useScrollTo` scrolls without animation. All 9 paths checked in Chromium.
+- Research results chart shows the relevance filter honestly: per failure kind, results shown / also named the failure / left out (`research[].relevant` added).
+
+### Phase 11: header (same branch)
+- Header redone: no "AC" logo mark (also removed from the landing nav; the favicon still uses it), the three tools as text tabs, engine status moved to a toast. Phones: tabs share the width on their own row; the repo field wraps (`.repo-row`). Checked light, dark and 390px.
+
+### Phase 12: Boost Your Startup wording + "Why startups fail" data (same branch)
+- Product name in the UI is now **Boost Your Startup** (descriptor: Agentic AI Co-Pilot). The project sheet keeps the report's official title. Landing copy follows the startup journey (idea, prototype, code, launch).
+- `data/startup_failure_reasons.json`: CB Insights, "The top 9 reasons startups fail" (published 2026-03-05, data as of 2026-02-06, 385 of 431 VC-backed shutdowns since 2023 with known reasons; shares overlap). The 9 shares were read from the report's chart image (checked visually), 4 of them are also in its text. Each reason says honestly whether this project checks it (covered / partly / none; operations and leadership is "none", cash runway is only "partly").
+- `tools/startup_failure_data.py`: `load()`, `check_text()`, `verify_live()` (fetches the report page, re-checks the 4 text figures and the sample size; cached 6 h). `GET /api/startup-failure-data?verify=1`. Live check on 2026-11-19: 4/4 match.
+- UI: `components/WhyStartupsFail.jsx` (bar chart coloured by coverage, click a bar for how the project answers it, "Check against the source now"). Shown on the landing page (`#why-fail`), as a "Why startups fail" tab in Startup Assistance results (adds "Your idea against these reasons" from the scorecard, judge and papers), and as a one-paragraph note on the Failure Simulator page.
+- If CB Insights publishes a new edition, update the JSON from the new report and keep the source fields true. Do not store the chart image (copyright); only the figures with the link.
+- Tests: 138 pass (`tests/test_startup_failure_data.py`).
+
 ### Measured numbers (real runs, keep updated)
 - Live idea run (Oct 2026, cloud, real key): 7 calls, ~16k tokens, 13 s, no fallbacks; every answer `finish_reason=stop` and used about half its max_tokens. Devil's advocate, Judge and PRD went to gpt-oss-20b because gpt-oss-120b's 8k/minute was used by the parallel steps (by design).
 - Code runs on `sample_repo`: 1 call, ~2.5k tokens, 3-13 s.
@@ -215,6 +269,8 @@ Grounded prompts, deterministic critic with quote-vs-disk and compile checks, ho
 ---
 
 ## 8. What is left and what needs improvement (start here next session)
+
+**Direction (user, Nov 2026): less tech, more research.** Do not add heavy tooling (live fault injection, sandboxes, new infra). Prefer features that show research: papers, CWE, citations checked against abstracts. Gemini as a backup model provider was discussed and postponed by the user ("we will take on gemini later").
 
 **Must fix / verify next (in this order)**
 - **Live check of all three demo ideas** (one prototype checked live in Phase 5): run the three demo ideas, then build a prototype for each. Check the generated page looks right, tests pass, the Code Fixer works when needed, and the monitor counts clicks in the preview. Record pass rate, tokens and build time under "Measured numbers" (real numbers only).

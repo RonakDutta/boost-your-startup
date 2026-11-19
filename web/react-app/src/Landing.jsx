@@ -1,5 +1,6 @@
 import PipelineGraph from './components/PipelineGraph.jsx'
-import { CODE_PIPELINE, STARTUP_PIPELINE } from './pipelines.js'
+import WhyStartupsFail from './components/WhyStartupsFail.jsx'
+import { CODE_PIPELINE, FAILURE_PIPELINE, STARTUP_PIPELINE } from './pipelines.js'
 
 // From the project report (cover page).
 const PROJECT = [
@@ -13,21 +14,25 @@ const PROJECT = [
 
 // Facts about how the system is built. Keep them true: if the code changes, change these.
 const SHEET = [
-  ['AI calls per idea run', '7, plus 1 or 2 for a prototype'],
+  ['AI calls per idea run', '7, plus usually 1 for a prototype'],
   ['Paper sources', 'arXiv, Semantic Scholar, OpenAlex (live)'],
   ['Idea score', '7-category rubric, computed in code'],
   ['Code search', 'BM25 keywords + MiniLM embeddings'],
+  ['Failure checks', '11 fixed checks, each named by its CWE weakness type'],
+  ['Research per failure', 'Live paper search; a paper is kept only if it names the failure'],
   ['Prototype', 'FastAPI + one page, tested with pytest'],
   ['Runs on', 'One Python server on this computer'],
 ]
 
-// Literature survey of the report; arXiv ids checked against arxiv.org.
+// Literature survey of the report; arXiv ids checked against arxiv.org, other links opened and checked.
 const PAPERS = [
   ['Lewis et al., 2020', 'Retrieval-Augmented Generation', '2005.11401', 'Answers are built from retrieved code and papers, not from memory'],
   ['Zhang et al., 2024', 'AutoCodeRover', '2404.05427', 'Code is split at function and class boundaries (AST), not into text blocks'],
   ['Jimenez et al., 2024', 'SWE-bench', '2310.06770', 'The task: point to the file and lines behind a real issue'],
   ['Shinn et al., 2023', 'Reflexion', '2303.11366', 'A critic checks the answer and allows one revision'],
   ['Wu et al., 2023', 'AutoGen', '2308.08155', 'Separate agents with one job each, such as devil\'s advocate and judge'],
+  ['Yuan et al., OSDI 2014', 'Simple Testing Can Prevent Most Critical Failures', 'https://www.usenix.org/conference/osdi14/technical-sessions/presentation/yuan', 'Most catastrophic failures they studied came from badly handled errors, so ignored errors are rated high'],
+  ['MITRE', 'CWE: Common Weakness Enumeration', 'https://cwe.mitre.org/', 'Every failure check is named by its public CWE weakness type'],
 ]
 
 const TOOLS = [
@@ -35,7 +40,7 @@ const TOOLS = [
     id: 'startup',
     n: '1',
     name: 'Startup Assistance',
-    line: 'Is this idea worth building, and has someone already done it?',
+    line: 'Step 1. Is this idea worth building, and has someone already done it?',
     steps: [
       'Searches the market and live research papers',
       'A devil\'s advocate argues against it, a judge weighs both sides',
@@ -47,12 +52,24 @@ const TOOLS = [
     id: 'code',
     n: '2',
     name: 'Codebase Evaluation',
-    line: 'Where is the bug, and what breaks if I change this?',
+    line: 'Step 2. Where is the bug in our code, and what breaks if we change it?',
     steps: [
       'Opens a local folder or a GitHub link',
       'Parses every file into functions and a call graph',
       'Finds the code behind a bug or a question',
       'A critic checks file, lines and quoted code against the disk',
+    ],
+  },
+  {
+    id: 'failure',
+    n: '3',
+    name: 'Failure Simulator',
+    line: 'Step 3. Where will the code fail on launch day, and what does research say?',
+    steps: [
+      'Fixed checks find failure points, each named by its CWE type',
+      'The call graph shows which features each failure would break',
+      'Live research papers on every kind of failure found',
+      'Suggested fixes, checked in code before you see them',
     ],
   },
 ]
@@ -62,6 +79,7 @@ const COMPARE = [
   ['Scores', 'Change each time you ask', 'Same formula in code, same score'],
   ['Code questions', 'Sees only the snippet you paste', 'Reads the whole project and checks line numbers on disk'],
   ['Prototype', 'Gives code you still have to run', 'Writes it, runs the tests, starts it, watches it'],
+  ['Failure points', 'Gives general advice', 'Named checks find them; papers back each kind; every fix is checked'],
   ['When the AI fails', 'Still answers confidently', 'Falls back to plain code and says so'],
 ]
 
@@ -71,10 +89,10 @@ export default function Landing({ onEnter, theme, setTheme }) {
       <nav className="l-nav">
         <div className="l-wrap l-nav-inner">
           <button className="l-brand" onClick={() => window.scrollTo({ top: 0 })}>
-            <span className="brand-mark" aria-hidden="true">AC</span>
-            <span>Agentic Co-Pilot</span>
+            <span>Boost Your Startup</span>
           </button>
           <div className="l-links">
+            <a href="#why-fail">Why startups fail</a>
             <a href="#tools">Tools</a>
             <a href="#how">How it works</a>
             <a href="#compare">Compared to a chatbot</a>
@@ -89,11 +107,11 @@ export default function Landing({ onEnter, theme, setTheme }) {
       <header className="l-wrap l-hero">
         <div className="l-hero-text">
           <p className="l-kicker">Minor Project (ARP-455), B.Tech IIoT, USAR, GGSIPU</p>
-          <h1>A second pair of eyes for your startup idea and your code.</h1>
+          <h1>Boost your startup, from the first idea to launch day.</h1>
           <p className="l-lead">
-            It checks an idea against real research papers and builds a small working prototype.
-            It reads a Python project and finds the lines behind a bug.
-            Code checks every answer before you see it.
+            Cooperating AI agents check your idea against real research papers and build a small
+            working prototype. Then they review your code and find where it would fail before launch,
+            with research papers on each kind of failure. Code checks every answer before you see it.
           </p>
           <div className="row" style={{ gap: 12 }}>
             <button className="btn primary l-big" onClick={() => onEnter('startup')}>Open the app</button>
@@ -113,20 +131,32 @@ export default function Landing({ onEnter, theme, setTheme }) {
           <h2 className="l-h2">The gap it fills</h2>
           <div>
             <p className="l-gap-text">
-              Tools today check an idea or debug code, not both. Most code assistants cut files into
-              fixed-size text blocks that break functions apart, or rewrite code without showing why.
+              A student startup needs help at every stage: is the idea new, can it be built, does the
+              code work, and will it hold up when real users arrive. Tools today cover one of these at
+              a time, and chatbots often answer without real sources.
             </p>
             <p className="l-gap-text strong">
-              This project grounds every answer in the real structure of the code and in live sources,
-              explains it, checks it in code, and never edits your files.
+              Boost Your Startup covers the whole path in one place. Every answer is grounded in live
+              research papers and in the real structure of the code, checked in code, and your files
+              are never edited.
             </p>
           </div>
         </div>
       </section>
 
+      <section id="why-fail" className="l-section">
+        <div className="l-wrap stack-lg">
+          <div>
+            <h2 className="l-h2">Why startups fail</h2>
+            <p className="l-note">Published data on 385 startups that shut down since 2023. Most failures start with the idea and the market, which is why the first tool checks the idea before any code is written.</p>
+          </div>
+          <WhyStartupsFail />
+        </div>
+      </section>
+
       <section id="tools" className="l-section">
         <div className="l-wrap">
-          <h2 className="l-h2">Two tools</h2>
+          <h2 className="l-h2">Three tools, one startup journey</h2>
           <div className="l-tools">
             {TOOLS.map((t) => (
               <article key={t.id} className="l-tool">
@@ -155,6 +185,10 @@ export default function Landing({ onEnter, theme, setTheme }) {
             <figcaption>Codebase Evaluation</figcaption>
             <PipelineGraph pipeline={CODE_PIPELINE} events={[]} phase="idle" />
           </figure>
+          <figure className="l-figure">
+            <figcaption>Failure Simulator</figcaption>
+            <PipelineGraph pipeline={FAILURE_PIPELINE} events={[]} phase="idle" />
+          </figure>
         </div>
       </section>
 
@@ -175,7 +209,7 @@ export default function Landing({ onEnter, theme, setTheme }) {
                 {PAPERS.map(([who, title, id, use]) => (
                   <tr key={id}>
                     <td>
-                      <a href={`https://arxiv.org/abs/${id}`} target="_blank" rel="noopener noreferrer">{title}</a>
+                      <a href={id.startsWith('http') ? id : `https://arxiv.org/abs/${id}`} target="_blank" rel="noopener noreferrer">{title}</a>
                       <div className="tiny muted">{who}</div>
                     </td>
                     <td>{use}</td>
@@ -193,7 +227,7 @@ export default function Landing({ onEnter, theme, setTheme }) {
           <p className="l-note">Partly. This is what changes when agents, live sources and code checks work together.</p>
           <div className="l-table-wrap">
             <table className="l-compare">
-              <thead><tr><th /><th>Plain chatbot</th><th>Agentic Co-Pilot</th></tr></thead>
+              <thead><tr><th /><th>Plain chatbot</th><th>Boost Your Startup</th></tr></thead>
               <tbody>
                 {COMPARE.map(([k, a, b]) => <tr key={k}><th scope="row">{k}</th><td>{a}</td><td>{b}</td></tr>)}
               </tbody>
@@ -204,16 +238,17 @@ export default function Landing({ onEnter, theme, setTheme }) {
 
       <section className="l-section l-end">
         <div className="l-wrap l-end-inner">
-          <h2 className="l-h2">Try it with your own idea or project.</h2>
+          <h2 className="l-h2">Start with your idea. Finish launch-ready.</h2>
           <div className="row" style={{ gap: 12 }}>
             <button className="btn primary l-big" onClick={() => onEnter('startup')}>Check an idea</button>
             <button className="btn l-big" onClick={() => onEnter('code')}>Evaluate a codebase</button>
+            <button className="btn l-big" onClick={() => onEnter('failure')}>Find failure points</button>
           </div>
         </div>
       </section>
 
       <footer className="l-wrap l-foot">
-        <span>Agentic AI Co-Pilot, by Ronak Dutta</span>
+        <span>Boost Your Startup (Agentic AI Co-Pilot), by Ronak Dutta</span>
         <span>Guide: Dr. Sanjay Kumar Singh, USAR, GGSIPU</span>
       </footer>
     </div>

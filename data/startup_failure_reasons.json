@@ -1,0 +1,43 @@
+{
+  "source": {
+    "publisher": "CB Insights",
+    "title": "The top 9 reasons startups fail",
+    "url": "https://www.cbinsights.com/research/report/startup-failure-reasons-top/",
+    "published": "2026-03-05",
+    "data_as_of": "2026-02-06",
+    "retrieved": "2026-11-19",
+    "sample": "431 VC-backed startups that publicly shut down since 2023; reasons could be identified for 385 of them",
+    "note": "A startup can have more than one reason, so the shares add up to more than 100%. The nine shares were read from the report's chart; the first four are also stated in its text and are re-checked against the live page.",
+    "companies_with_reasons": 385,
+    "companies_total": 431
+  },
+  "reasons": [
+    {"id": "capital", "reason": "Ran out of capital", "share": 70, "in_text": true,
+     "coverage": "partly", "covered_by": "Scorecard: Resource Requirements",
+     "how": "The scorecard rates what the idea needs to build. It does not model cash or runway."},
+    {"id": "pmf", "reason": "Poor product-market fit", "share": 43, "in_text": true,
+     "coverage": "covered", "covered_by": "Idea check: problem and market scores, devil's advocate, research papers",
+     "how": "Problem Validation and Market Demand scores, the devil's advocate, and the novelty index against research papers."},
+    {"id": "timing", "reason": "Wrong market timing or macro conditions", "share": 29, "in_text": true,
+     "coverage": "partly", "covered_by": "Research papers: papers per year, live market search",
+     "how": "Shows whether research on the topic is active (papers per year) and what the market search found now."},
+    {"id": "economics", "reason": "Unsustainable unit economics", "share": 19, "in_text": true,
+     "coverage": "partly", "covered_by": "Scorecard: Execution & Go-To-Market",
+     "how": "The nearest signal is the go-to-market score. There is no cost or pricing model."},
+    {"id": "pivot", "reason": "Ineffective strategic pivot", "share": 6, "in_text": false,
+     "coverage": "partly", "covered_by": "Judge's verdict (GO, PIVOT or KILL)",
+     "how": "The judge says whether to go ahead, change direction or stop, with the mitigations it requires."},
+    {"id": "competition", "reason": "Outcompeted by rivals", "share": 6, "in_text": false,
+     "coverage": "covered", "covered_by": "Market tab and Competition & Defensibility score",
+     "how": "Competitors from the live web search, the closest research papers, and the Competition & Defensibility score."},
+    {"id": "operations", "reason": "Operational or leadership challenges", "share": 5, "in_text": false,
+     "coverage": "none", "covered_by": "Not covered",
+     "how": "Team and leadership are not assessed by this project."},
+    {"id": "technical", "reason": "Technical or clinical issues", "share": 3, "in_text": false,
+     "coverage": "covered", "covered_by": "Technical Feasibility score, Prototype tests, Codebase Evaluation, Failure Simulator",
+     "how": "The prototype is tested and run, and the Failure Simulator finds where the code would fail."},
+    {"id": "legal", "reason": "Fraud or legal problems", "share": 3, "in_text": false,
+     "coverage": "partly", "covered_by": "Risk Assessment score, Failure Simulator (secrets, injection)",
+     "how": "Legal and security risks in the scorecard, and security weaknesses in the code. Fraud is not assessed."}
+  ]
+}
