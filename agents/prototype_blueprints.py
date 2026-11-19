@@ -50,10 +50,12 @@ Return only this JSON:
  "entity_plural": "e.g. Readings", "action": "button text, e.g. Add reading",
  "fields": [{"name": "snake_case", "label": "Label", "type": "text|long_text|number|choice|date", "choices": ["only for choice"], "min": 0, "max": 1000}],
  "seed": [4 to 6 records, each with a value for every field],
- "rule": {...}}
+ "rule": {...},
+ "look": {"theme": "blue|teal|amber|indigo|green|rose|slate", "layout": "dashboard|sidebar|banner", "header": "light|accent|dark"}}
 - 3 to 5 fields; every *_field in the rule must be one of them.
 - Seed records: realistic names, places and numbers for this idea's users in India, dates in the last two weeks. No Alice/Bob, foo or test.
-- For review, seed texts are short (under 6 lines) and some pass and some fail the checks."""
+- For review, seed texts are short (under 6 lines) and some pass and some fail the checks.
+- look: colours that suit the idea (water: teal or blue, energy: amber, health: rose, farming: green, code: indigo)."""
 
 
 # ---------------------------------------------------------------- helpers
@@ -192,6 +194,44 @@ def _coerce(field: Dict[str, Any], value: Any) -> Any:
     return text
 
 
+THEMES = ("blue", "teal", "amber", "indigo", "green", "rose", "slate")
+LAYOUTS = ("dashboard", "sidebar", "banner")
+HEADERS = ("light", "accent", "dark")
+_THEME_WORDS = (("teal", r"water|leak|pipe|ocean|clean"), ("amber", r"energy|power|electric|solar|kwh|food|canteen"),
+                ("indigo", r"code|program|lab|student|review|exam"), ("green", r"farm|crop|tractor|plant|waste|green|agri"),
+                ("rose", r"health|patient|hospital|clinic|blood|doctor"), ("slate", r"complaint|ticket|hostel|admin"))
+
+
+# Default layout and header for each colour, so ideas with different colours also get different pages.
+_THEME_LOOK = {"teal": ("dashboard", "dark"), "amber": ("banner", "light"), "indigo": ("sidebar", "accent"),
+               "green": ("sidebar", "light"), "rose": ("banner", "dark"), "slate": ("dashboard", "accent")}
+
+
+def _stable(text: str) -> int:
+    """Same idea, same number (Python's hash() changes between runs)."""
+    return sum((i + 1) * ord(c) for i, c in enumerate(text or ""))
+
+
+def pick_look(design: Dict[str, Any], spec: Dict[str, Any], kind: str) -> Dict[str, str]:
+    """The AI's choice when valid; otherwise colours from words in the idea and a layout from the idea text."""
+    look = design.get("look") if isinstance(design.get("look"), dict) else {}
+    text = spec_text(spec).lower()
+    seed = _stable(spec.get("title", "") + kind)
+    theme = str(look.get("theme", "")).lower()
+    if theme not in THEMES:
+        theme = next((t for t, words in _THEME_WORDS if re.search(words, text)), THEMES[seed % len(THEMES)])
+    default_layout, default_header = _THEME_LOOK.get(theme, (LAYOUTS[(seed // 7) % 3], HEADERS[(seed // 3) % 3]))
+    layout = str(look.get("layout", "")).lower()
+    if layout not in LAYOUTS:
+        layout = default_layout
+    header = str(look.get("header", "")).lower()
+    if header not in HEADERS:
+        header = default_header
+    if layout == "banner":
+        header = "light" if header == "accent" else header  # the banner already carries the colour
+    return {"theme": theme, "layout": layout, "header": header}
+
+
 def normalize(design: Dict[str, Any], spec: Dict[str, Any]) -> Dict[str, Any]:
     """Cleans an AI design into one the generator can always build. Raises ValueError for 'custom' or junk."""
     if not isinstance(design, dict):
@@ -305,6 +345,7 @@ def normalize(design: Dict[str, Any], spec: Dict[str, Any]) -> Dict[str, Any]:
         "fields": fields,
         "seed": seed[:12],
         "rule": rule,
+        "look": pick_look(design, spec, kind),
     }
 
 
@@ -1057,10 +1098,60 @@ def _page(d: Dict[str, Any]) -> str:
     group_label = next((f["label"] for f in d["fields"] if f["name"] == rule.get("group_field")), "group")
     side_title = _SIDE_TITLE[kind].format(group=group_label.lower())
     e = html.escape
+    look = d.get("look") or {"theme": "blue", "layout": "dashboard", "header": "light"}
     stat_cards = "\n".join(
-        f'    <div class="card"><div class="muted">{e(label)}</div><div class="stat" id="stat-{key}">0</div></div>'
+        f'      <div class="card"><div class="muted">{e(label)}</div><div class="stat" id="stat-{key}">0</div></div>'
         for key, label in stats)
     config = json.dumps(app, indent=1, ensure_ascii=False).replace("</", "<\\/")
+    form_card = (f'<div class="card"><h2>{e(d["action"])}</h2><form id="form"></form>'
+                 f'<p class="error" id="error"></p><p class="muted" id="latest"></p></div>')
+    side_card = f'<div class="card"><h2>{e(side_title)}</h2><div id="side"></div></div>'
+    table_card = (f'<div class="card"><h2>{e(d["entity_plural"])}</h2><div style="overflow-x:auto"><table>'
+                  f'<thead><tr id="head"></tr></thead><tbody id="rows"></tbody></table></div></div>')
+    header = (f'<header class="top"><div class="wrap"><span class="brand">{e(d["app_name"])}</span>'
+              f'<span class="muted">{e(d["tagline"])}</span></div></header>')
+    if look["layout"] == "sidebar":
+        body = f"""{header}
+<main class="wrap">
+  <div class="side-layout">
+    <aside>
+      {form_card}
+      {side_card}
+    </aside>
+    <section>
+      <div class="grid">
+{stat_cards}
+      </div>
+      {table_card}
+    </section>
+  </div>
+</main>"""
+    elif look["layout"] == "banner":
+        brand = f'<span class="brand">{e(d["app_name"])}</span>'
+        body = f"""<header class="top"><div class="wrap">{brand}<span class="muted">{e(d["entity_plural"])}</span></div></header>
+<section class="banner"><div class="wrap"><h1>{e(d["app_name"])}</h1><p class="muted">{e(d["tagline"])}</p></div></section>
+<main class="wrap">
+  <div class="grid banner-stats">
+{stat_cards}
+  </div>
+  {form_card.replace('<form id="form">', '<form id="form" class="form-inline">')}
+  <div class="cols">
+    {table_card}
+    {side_card}
+  </div>
+</main>"""
+    else:
+        body = f"""{header}
+<main class="wrap">
+  <div class="grid">
+{stat_cards.replace('class="card"', 'class="card accent-line"')}
+  </div>
+  <div class="cols">
+    {form_card}
+    {side_card}
+  </div>
+  {table_card}
+</main>"""
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -1069,29 +1160,8 @@ def _page(d: Dict[str, Any]) -> str:
 <title>{e(d["app_name"])}</title>
 <link rel="stylesheet" href="/static/base.css">
 </head>
-<body>
-<header class="top"><div class="wrap"><span class="brand">{e(d["app_name"])}</span><span class="muted">{e(d["tagline"])}</span></div></header>
-<main class="wrap">
-  <div class="grid">
-{stat_cards}
-  </div>
-  <div class="cols">
-    <div class="card">
-      <h2>{e(d["action"])}</h2>
-      <form id="form"></form>
-      <p class="error" id="error"></p>
-      <p class="muted" id="latest"></p>
-    </div>
-    <div class="card">
-      <h2>{e(side_title)}</h2>
-      <div id="side"></div>
-    </div>
-  </div>
-  <div class="card">
-    <h2>{e(d["entity_plural"])}</h2>
-    <div style="overflow-x:auto"><table><thead><tr id="head"></tr></thead><tbody id="rows"></tbody></table></div>
-  </div>
-</main>
+<body data-theme="{look["theme"]}" data-layout="{look["layout"]}" data-header="{look["header"]}">
+{body}
 <script>
 const APP = {config};
 {_JS_KIND[kind].strip()}

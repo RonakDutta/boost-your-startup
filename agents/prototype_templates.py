@@ -78,52 +78,75 @@ def index():
     return FileResponse(HERE / "static" / "index.html")
 '''
 
-BASE_CSS = """/* Prototype stylesheet (fixed template). Flat and plain on purpose. */
+BASE_CSS = """/* Prototype stylesheet (fixed file). Flat and plain on purpose; colours come from the theme. */
+:root { --accent: #1f6feb; --bg: #f6f7f9; --soft: #eef1f4; --card: #fff; --text: #1f2328; --muted: #656d76; --line: #dde1e6; --radius: 6px; }
+[data-theme="teal"] { --accent: #0f766e; --bg: #f2f7f6; --soft: #e1efec; }
+[data-theme="amber"] { --accent: #b45309; --bg: #faf7f2; --soft: #f5ead9; }
+[data-theme="indigo"] { --accent: #4338ca; --bg: #f5f5fa; --soft: #e7e7f6; }
+[data-theme="green"] { --accent: #15803d; --bg: #f3f8f4; --soft: #e0efe3; }
+[data-theme="rose"] { --accent: #be123c; --bg: #faf5f6; --soft: #f5e1e6; }
+[data-theme="slate"] { --accent: #334155; --bg: #f4f5f7; --soft: #e3e7ec; --radius: 2px; }
 * { box-sizing: border-box; }
-body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #1f2328; background: #f6f7f9; }
-.top { background: #fff; border-bottom: 1px solid #dde1e6; }
-.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 14px; padding-bottom: 14px; }
+body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: var(--text); background: var(--bg); }
+.top { background: var(--card); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 14px; padding-bottom: 14px; flex-wrap: wrap; }
+[data-header="accent"] .top { background: var(--accent); border-color: var(--accent); color: #fff; }
+[data-header="dark"] .top { background: #1f2328; border-color: #1f2328; color: #fff; }
+[data-header="accent"] .top .muted, [data-header="dark"] .top .muted { color: rgba(255, 255, 255, 0.78); }
 .brand { font-weight: 700; font-size: 17px; }
-.wrap { max-width: 960px; margin: 0 auto; padding: 0 16px; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
 main.wrap { padding-top: 20px; padding-bottom: 40px; }
-h1 { font-size: 22px; margin: 0 0 4px; }
+h1 { font-size: 24px; margin: 0 0 4px; }
 h2 { font-size: 16px; margin: 0 0 10px; }
 p { margin: 0 0 10px; }
-.muted { color: #656d76; font-size: 13px; }
-.card { background: #fff; border: 1px solid #dde1e6; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.muted { color: var(--muted); font-size: 13px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .stat { font-size: 26px; font-weight: 700; }
-.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 13px; color: #656d76; }
+.accent-line { border-top: 3px solid var(--accent); }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 13px; color: var(--muted); }
 input, select, textarea { font: inherit; color: inherit; padding: 8px 10px; border: 1px solid #c9ced4; border-radius: 4px; background: #fff; width: 100%; }
 textarea { min-height: 70px; }
 .btn { font: inherit; padding: 8px 14px; border: 1px solid #c9ced4; border-radius: 4px; background: #fff; cursor: pointer; }
-.btn:hover { background: #f0f2f4; }
-.btn.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
-.btn.primary:hover { background: #1a5fd0; }
+.btn:hover { background: var(--soft); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(0.92); background: var(--accent); }
 .btn.small { padding: 4px 10px; font-size: 13px; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #eceef1; vertical-align: top; }
-th { color: #656d76; font-weight: 600; font-size: 13px; }
+th { color: var(--muted); font-weight: 600; font-size: 13px; }
 .list { list-style: none; padding: 0; margin: 0; }
 .list li { padding: 10px 0; border-bottom: 1px solid #eceef1; }
+.list-row { padding: 8px 0; border-bottom: 1px solid #eceef1; }
+.list-row:last-child { border-bottom: 0; }
+.bar { height: 6px; background: var(--soft); border-radius: 3px; margin-top: 6px; }
+.bar > span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
 .tag { display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: 12px; background: #eef1f4; color: #424a53; }
 .tag.good { background: #dafbe1; color: #116329; }
 .tag.warn { background: #fff8c5; color: #7d4e00; }
 .tag.bad { background: #ffebe9; color: #a40e26; }
-.empty { color: #656d76; padding: 12px 0; }
+.empty { color: var(--muted); padding: 12px 0; }
 .error { color: #a40e26; font-size: 13px; }
-.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
-.list-row { padding: 8px 0; border-bottom: 1px solid #eceef1; }
-.list-row:last-child { border-bottom: 0; }
-.bar { height: 6px; background: #eef1f4; border-radius: 3px; margin-top: 6px; }
-.bar > span { display: block; height: 100%; background: #1f6feb; border-radius: 3px; }
+/* Layout "sidebar": form and side panel on the left, numbers and records on the right. */
+.side-layout { display: grid; grid-template-columns: 330px 1fr; gap: 16px; align-items: start; }
+.side-layout aside .card:first-child { border-top: 3px solid var(--accent); }
+/* Layout "banner": a coloured band with the title and the numbers, then a one-row form. */
+.banner { background: var(--accent); color: #fff; padding: 28px 0 70px; }
+.banner .muted { color: rgba(255, 255, 255, 0.8); font-size: 14px; }
+.banner-stats { margin-top: -54px; }
+.banner-stats .card { box-shadow: none; }
+.form-inline { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: end; }
+.form-inline .field { margin-bottom: 0; }
+.form-inline .field:has(textarea) { grid-column: 1 / -1; }
+@media (max-width: 760px) { .side-layout { grid-template-columns: 1fr; } }
 """
 
 # Classes the AI is told it may use (kept next to the stylesheet so they agree).
 CSS_CLASSES = (
     "top, wrap, brand, card, grid, row, stat, field, btn, btn primary, btn small, "
-    "muted, list, tag, tag good, tag warn, tag bad, empty, error, cols, list-row, bar; plain table/th/td"
+    "muted, list, tag, tag good, tag warn, tag bad, empty, error, cols, list-row, bar, accent-line; plain table/th/td"
 )
 
 README = """# {title}
