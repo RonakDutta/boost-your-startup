@@ -235,7 +235,7 @@ function Points({ out, focus, goTo }) {
 
 function Research({ out, focus, goTo }) {
   const picked = focus?.by === 'type' ? focus.value : null
-  useScrollTo(`research-${picked}`, !!picked)
+  useScrollTo(`research-${picked}`, !!picked, focus)
   const groups = out.research || []
   const all = groups.flatMap((g) => g.papers.map((p) => ({ ...p, kind: g.title })))
   const yearData = yearColumns(all)
@@ -278,9 +278,9 @@ function Research({ out, focus, goTo }) {
                 <div className="stack" style={{ gap: 4 }}>
                   <SafeLink href={p.url}><span className="paper-title">{p.title}</span></SafeLink>
                   <div className="tiny muted">{authors(p.authors)}{p.year ? ` · ${p.year}` : ''} · {SOURCE_NAMES[p.source] || p.source}{p.citation_count ? ` · ${p.citation_count} citations` : ''}</div>
-                  {i === 0 && p.key_sentence && <div className="small" style={{ borderLeft: '3px solid var(--accent)', paddingLeft: 10 }}>{p.key_sentence}</div>}
+                  {i === 0 && p.key_sentence && <div className="quote">"{p.key_sentence}"</div>}
                   <More label="Abstract, links and reference">
-                    {i > 0 && p.key_sentence && <p className="small" style={{ marginTop: 0, borderLeft: '3px solid var(--line)', paddingLeft: 10 }}>{p.key_sentence}</p>}
+                    {i > 0 && p.key_sentence && <div className="quote" style={{ marginBottom: 8 }}>"{p.key_sentence}"</div>}
                     <p className="small" style={{ marginTop: 0 }}>{p.abstract || 'No abstract available.'}</p>
                     <div className="paper-links" style={{ marginBottom: 6 }}>
                       <SafeLink href={p.url}>Open paper</SafeLink>
@@ -352,7 +352,7 @@ function FixCard({ x, f, picked }) {
 function Fixes({ out, focus }) {
   const byId = Object.fromEntries((out.findings || []).map((f) => [f.id, f]))
   const picked = focus?.by === 'type' ? focus.value : null
-  useScrollTo(`fix-${picked}`, !!picked)
+  useScrollTo(`fix-${picked}`, !!picked, focus)
   const v = out.verification || {}
   return (
     <div className="stack-lg">

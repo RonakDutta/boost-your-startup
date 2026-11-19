@@ -57,6 +57,8 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
+/* Items scrolled to by a chart click land just under the header and the sub-tabs. */
+html { scroll-padding-top: calc(var(--topbar-h, 59px) + 60px); }
 body {
   background: var(--bg);
   color: var(--ink);
@@ -213,13 +215,17 @@ h3 { font-size: 15px; font-weight: 650; margin: 0; }
 /* ---------- tabs ---------- */
 .tabs {
   display: flex; gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto;
-  position: sticky; top: 57px; z-index: 10; background: var(--bg);
+  position: sticky; top: var(--topbar-h, 59px); z-index: 10; background: var(--bg);
+  scrollbar-width: none;
 }
+.tabs::-webkit-scrollbar { display: none; }
 .tabs button {
-  border: 0; background: transparent; padding: 10px 14px; font-size: 14px; font-weight: 550;
-  color: var(--muted); cursor: pointer; white-space: nowrap; border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border: 1px solid transparent; border-bottom: 0; background: transparent; padding: 10px 14px; margin-bottom: -1px;
+  font-size: 14px; font-weight: 550; color: var(--muted); cursor: pointer; white-space: nowrap;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
 }
-.tabs button.on { color: var(--ink); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.tabs button:hover { color: var(--ink); }
+.tabs button.on { color: var(--ink); background: var(--surface); border-color: var(--line); padding-bottom: 11px; }
 .tabs .count { font-size: 11px; color: var(--muted); margin-left: 5px; font-weight: 500; }
 
 /* ---------- metrics ---------- */
@@ -281,7 +287,7 @@ h3 { font-size: 15px; font-weight: 650; margin: 0; }
 
 /* ---------- papers ---------- */
 .spotlight { border: 1px solid var(--ink-2); }
-.paper { display: grid; grid-template-columns: 38px minmax(0, 1fr) 120px; gap: 12px; padding: 14px 4px; border-bottom: 1px solid var(--line); align-items: start; }
+.paper { display: grid; grid-template-columns: 38px minmax(0, 1fr) 120px; gap: 12px; padding: 14px 12px; margin: 0 -12px; border-bottom: 1px solid var(--line); border-radius: var(--radius-sm); align-items: start; }
 .paper:last-child { border-bottom: 0; }
 .paper .ref { font-family: var(--mono); font-size: 12.5px; color: var(--accent-ink); font-weight: 600; padding-top: 2px; }
 .paper-title { font-weight: 600; color: var(--ink); line-height: 1.35; }
@@ -448,9 +454,12 @@ details.more[open] > summary::before { content: '- '; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (max-width: 640px) { .hbars { grid-template-columns: minmax(0, 110px) minmax(0, 1fr) !important; } .tl-row { grid-template-columns: minmax(0, 110px) minmax(0, 1fr); } }
 
-/* An item reached by clicking a chart: a plain accent edge, no animation. */
-.picked { box-shadow: inset 3px 0 0 var(--accent); background: var(--accent-soft); }
-.card.picked { border-color: var(--accent); background: var(--surface); box-shadow: inset 3px 0 0 var(--accent); }
+/* An item reached by clicking a chart: a soft tint and a thin accent border, no side bar, no animation. */
+.picked { background: color-mix(in srgb, var(--accent) 6%, var(--surface)); outline: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: -1px; }
+.paper.picked { border-bottom-color: transparent; }
+.card.picked { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); outline: 0; background: var(--surface); }
+.picked-tag { display: inline-block; white-space: nowrap; font-size: 12px; font-weight: 600; color: var(--accent-ink); margin-left: 8px; }
+.quote { font-size: 13.5px; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px 12px; margin: 2px 0; }
 .focus-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; border: 1px solid var(--accent); border-radius: var(--radius-sm); background: var(--accent-soft); font-size: 13.5px; }
 .fail-rows { display: grid; }
 .fail-row { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) 76px; gap: 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }

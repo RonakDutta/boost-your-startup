@@ -189,7 +189,7 @@ Grounded prompts, deterministic critic with quote-vs-disk and compile checks, ho
 - Code: verdict screen (grounding score, question mode, checks passed, top location, blast radius, repo size, critic bars), Findings (verification checks + before/after code with real line numbers), Impact (callers, flow, impact graph), How it ran.
 - Follow-up chat on both. Light/dark theme. Works at 390px width (graph scrolls inside its box).
 - DOMPurify + Mermaid strict mode (closes the old XSS gap). No CDN dependency in the new UI.
-- Stable tab switching in Startup Assistance and Codebase Evaluation: removed `window.scrollTo({ top: 0 })` on tab changes so switching tabs (e.g. Overview to Research papers) updates content in place without jumping to the top of the page.
+- Tab switching: see Phase 13 (the page now goes to the top of the new tab's content, not the top of the page).
 - Tests: `tests/test_run_stream.py`; total 104 pass.
 
 ### Phase 3b: fixes from the "must fix" list (done, merged in PR #4)
@@ -256,6 +256,15 @@ Grounded prompts, deterministic critic with quote-vs-disk and compile checks, ho
 - UI: `components/WhyStartupsFail.jsx` (bar chart coloured by coverage, click a bar for how the project answers it, "Check against the source now"). Shown on the landing page (`#why-fail`), as a "Why startups fail" tab in Startup Assistance results (adds "Your idea against these reasons" from the scorecard, judge and papers), and as a one-paragraph note on the Failure Simulator page.
 - If CB Insights publishes a new edition, update the JSON from the new report and keep the source fields true. Do not store the chart image (copyright); only the figures with the link.
 - Tests: 138 pass (`tests/test_startup_failure_data.py`).
+
+### Phase 13: UI scroll and highlight fixes (branch `claude/laughing-newton-2ne3ry`)
+- Sub-tabs (`Tabs` in `ui.jsx`): when you switch tabs after scrolling down, the page jumps to the top of the new tab's content, right under the sticky tab bar (measured in a layout effect, no animation). If the bar is not stuck, nothing moves. The bar sticks under the real header height (`--topbar-h`, set by a ResizeObserver in `Header`; the header is taller on phones).
+- Header tools: each tool remembers its own scroll position (`App.jsx`), so switching tools no longer leaves you mid-page on the other tool.
+- Item picked from a chart (`.picked`): soft tint + thin accent border and a "Selected in the chart" label instead of the thick blue side bar. Chart clicks scroll the item's top under the sticky bars (`scroll-padding-top`, `useScrollTo(..., again)` re-scrolls when the same bar is clicked twice). Failure research key sentences use a plain quote box (`.quote`) instead of a blue side line.
+- Research papers: hooks moved above early returns in `Papers.jsx` (React rule-of-hooks bug); fallback "Not assessed (LLM unavailable)" lines are hidden instead of shown; AI text goes through `plainText()` (also maps "LLM" to "AI").
+- Backend: fallback PRD requirement titles were cut at 30 characters mid-word ("Core telemetry and ingestion p"); now shortened at a word boundary (max 60) in `prd_agent.py`.
+- Landing page: students are Ronak Dutta and Vishal Dev (project sheet and footer).
+- Checked in Chromium: light, dark, 390px; tab bar lands at the header line after a switch; tool switch restores scroll. Tests: 138 pass.
 
 ### Measured numbers (real runs, keep updated)
 - Live idea run (Oct 2026, cloud, real key): 7 calls, ~16k tokens, 13 s, no fallbacks; every answer `finish_reason=stop` and used about half its max_tokens. Devil's advocate, Judge and PRD went to gpt-oss-20b because gpt-oss-120b's 8k/minute was used by the parallel steps (by design).

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { getJSON, postJSON } from './api.js'
 import { useRun } from './useRun.js'
 import { CODE_PIPELINE, FAILURE_PIPELINE, STARTUP_PIPELINE } from './pipelines.js'
@@ -92,8 +92,18 @@ function EngineToast() {
 }
 
 function Header({ pillar, setPillar, theme, setTheme, onHome }) {
+  // The sub-tabs stick right under the header, whose height changes on phones (tabs wrap to a second row).
+  const ref = useRef(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    const set = () => document.documentElement.style.setProperty('--topbar-h', `${el.offsetHeight}px`)
+    set()
+    const ro = new ResizeObserver(set)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   return (
-    <header className="topbar">
+    <header className="topbar" ref={ref}>
       <div className="topbar-inner">
         <button className="brand link" onClick={onHome} title="Back to the start page">
           <span className="brand-name">Boost Your Startup</span>
@@ -312,8 +322,23 @@ function readRoute() {
 
 export default function App() {
   const [route, setRoute] = useState(readRoute)
-  const [pillar, setPillar] = useState(route.pillar)
+  const [pillar, setPillarRaw] = useState(route.pillar)
   const [theme, setTheme] = useState(readTheme)
+  // Each tool remembers where you were on its page, so switching tools does not leave you mid-page elsewhere.
+  const scrollAt = useRef({})
+  const restore = useRef(null)
+  const current = useRef(pillar)
+  const setPillar = (p, top) => {
+    if (current.current !== p) {
+      scrollAt.current[current.current] = window.scrollY
+      restore.current = top ?? scrollAt.current[p] ?? 0
+      current.current = p
+    } else if (top !== undefined) window.scrollTo({ top, behavior: 'instant' })
+    setPillarRaw(p)
+  }
+  useLayoutEffect(() => {
+    if (restore.current !== null) { window.scrollTo({ top: restore.current, behavior: 'instant' }); restore.current = null }
+  }, [pillar])
   useEffect(() => {
     const onHash = () => { const r = readRoute(); setRoute(r); if (r.inApp) setPillar(r.pillar) }
     window.addEventListener('hashchange', onHash)
@@ -322,8 +347,8 @@ export default function App() {
   const enter = (p) => { window.location.hash = p === 'code' ? '#/app/code' : p === 'failure' ? '#/app/failure' : '#/app'; window.scrollTo({ top: 0 }) }
   const home = () => { window.location.hash = ''; window.scrollTo({ top: 0 }) }
   useEffect(() => {
-    const toCode = () => { setPillar('code'); window.scrollTo({ top: 0 }) }
-    const toFailure = () => { setPillar('failure'); window.scrollTo({ top: 0 }) }
+    const toCode = () => setPillar('code', 0)
+    const toFailure = () => setPillar('failure', 0)
     window.addEventListener('copilot:review', toCode)
     window.addEventListener('copilot:failure', toFailure)
     return () => { window.removeEventListener('copilot:review', toCode); window.removeEventListener('copilot:failure', toFailure) }
