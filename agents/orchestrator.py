@@ -1182,7 +1182,7 @@ class OrchestratorAgent:
 
     def _render_markdown_report(self, sections: List[Dict[str, Any]], title: str) -> str:
         """Renders the 13 sections into clean markdown document without horizontal rule dashes."""
-        blocks = [f"# Multi-Agent Idea Validation Report: {title}\n"]
+        blocks = [f"# Boost Your Startup: Idea Validation Report for {title}\n"]
         for s in sections:
             blocks.append(f"## {s['section_number']}. {s['title']}\n{s['content']}\n")
         return "\n".join(blocks)

@@ -96,8 +96,8 @@ function Header({ pillar, setPillar, theme, setTheme, onHome }) {
     <header className="topbar">
       <div className="topbar-inner">
         <button className="brand link" onClick={onHome} title="Back to the start page">
-          <span className="brand-name">Agentic Co-Pilot</span>
-          <span className="brand-sub">Minor project · GGSIPU USAR</span>
+          <span className="brand-name">Boost Your Startup</span>
+          <span className="brand-sub">Agentic AI Co-Pilot · minor project</span>
         </button>
         <nav className="nav-tabs" role="tablist" aria-label="Choose a tool">
           {TOOLS.map(([id, label]) => (
@@ -129,7 +129,7 @@ function StartupPage() {
         <div className="hero">
           <div className="eyebrow accent">Startup Assistance</div>
           <h1 className="display">Is your idea worth building?</h1>
-          <p>Seven agents check it against the market, real research papers and a devil's advocate, score it with a fixed rubric, and can then build a small working prototype.</p>
+          <p>The first step to boosting your startup: seven agents check your idea against the market, real research papers and a devil's advocate, score it with a fixed rubric, and then build a small working prototype.</p>
         </div>
       )}
       <div className="card composer" style={{ marginTop: run ? 24 : 0 }}>
@@ -193,7 +193,7 @@ function CodePage() {
         <div className="hero">
           <div className="eyebrow accent">Codebase Evaluation</div>
           <h1 className="display">Find the bug. See what a change would break.</h1>
-          <p>Point it at a Python project. It reads the code structure, finds the right functions, and a critic checks every answer against your real files. Nothing is edited.</p>
+          <p>Point it at your startup's Python project. It reads the code structure, finds the functions behind a bug or a question, and a critic checks every answer against your real files. Nothing is edited.</p>
         </div>
       )}
       <div className="card composer" style={{ marginTop: run ? 24 : 0 }}>
@@ -265,7 +265,7 @@ function FailurePage() {
         <div className="hero">
           <div className="eyebrow accent">Failure Simulator</div>
           <h1 className="display">Will your code survive launch day?</h1>
-          <p>Upload a Python project. It finds the places where the code is likely to fail, shows what each failure would break, and links every kind of failure to research papers that study it.</p>
+          <p>Before your startup goes live, find the places where its code is likely to fail. See what each failure would break for your users, and what research papers say about that kind of failure.</p>
         </div>
       )}
       <div className="card composer" style={{ marginTop: run ? 24 : 0 }}>
@@ -338,7 +338,7 @@ export default function App() {
         <div hidden={pillar !== 'failure'}><FailurePage /></div>
         <footer className="foot">
           <span>Every score is computed in code. AI text is labelled, and so are fallbacks.</span>
-          <span>Agentic Co-Pilot · B.Tech minor project, GGSIPU USAR</span>
+          <span>Boost Your Startup · B.Tech minor project, USAR, GGSIPU</span>
         </footer>
       </main>
     </>

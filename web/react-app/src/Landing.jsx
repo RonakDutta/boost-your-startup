@@ -39,7 +39,7 @@ const TOOLS = [
     id: 'startup',
     n: '1',
     name: 'Startup Assistance',
-    line: 'Is this idea worth building, and has someone already done it?',
+    line: 'Step 1. Is this idea worth building, and has someone already done it?',
     steps: [
       'Searches the market and live research papers',
       'A devil\'s advocate argues against it, a judge weighs both sides',
@@ -51,7 +51,7 @@ const TOOLS = [
     id: 'code',
     n: '2',
     name: 'Codebase Evaluation',
-    line: 'Where is the bug, and what breaks if I change this?',
+    line: 'Step 2. Where is the bug in our code, and what breaks if we change it?',
     steps: [
       'Opens a local folder or a GitHub link',
       'Parses every file into functions and a call graph',
@@ -63,7 +63,7 @@ const TOOLS = [
     id: 'failure',
     n: '3',
     name: 'Failure Simulator',
-    line: 'Where will this code fail on launch day, and what does research say about it?',
+    line: 'Step 3. Where will the code fail on launch day, and what does research say?',
     steps: [
       'Fixed checks find failure points, each named by its CWE type',
       'The call graph shows which features each failure would break',
@@ -88,7 +88,7 @@ export default function Landing({ onEnter, theme, setTheme }) {
       <nav className="l-nav">
         <div className="l-wrap l-nav-inner">
           <button className="l-brand" onClick={() => window.scrollTo({ top: 0 })}>
-            <span>Agentic Co-Pilot</span>
+            <span>Boost Your Startup</span>
           </button>
           <div className="l-links">
             <a href="#tools">Tools</a>
@@ -105,12 +105,11 @@ export default function Landing({ onEnter, theme, setTheme }) {
       <header className="l-wrap l-hero">
         <div className="l-hero-text">
           <p className="l-kicker">Minor Project (ARP-455), B.Tech IIoT, USAR, GGSIPU</p>
-          <h1>A second pair of eyes for your startup idea and your code.</h1>
+          <h1>Boost your startup, from the first idea to launch day.</h1>
           <p className="l-lead">
-            It checks an idea against real research papers and builds a small working prototype.
-            It reads a Python project, finds the lines behind a bug, and finds where the code
-            would fail, with research papers on each kind of failure.
-            Code checks every answer before you see it.
+            Cooperating AI agents check your idea against real research papers and build a small
+            working prototype. Then they review your code and find where it would fail before launch,
+            with research papers on each kind of failure. Code checks every answer before you see it.
           </p>
           <div className="row" style={{ gap: 12 }}>
             <button className="btn primary l-big" onClick={() => onEnter('startup')}>Open the app</button>
@@ -130,12 +129,14 @@ export default function Landing({ onEnter, theme, setTheme }) {
           <h2 className="l-h2">The gap it fills</h2>
           <div>
             <p className="l-gap-text">
-              Tools today check an idea or debug code, not both. Most code assistants cut files into
-              fixed-size text blocks that break functions apart, or rewrite code without showing why.
+              A student startup needs help at every stage: is the idea new, can it be built, does the
+              code work, and will it hold up when real users arrive. Tools today cover one of these at
+              a time, and chatbots often answer without real sources.
             </p>
             <p className="l-gap-text strong">
-              This project grounds every answer in the real structure of the code and in live research
-              papers, explains it, checks it in code, and never edits your files.
+              Boost Your Startup covers the whole path in one place. Every answer is grounded in live
+              research papers and in the real structure of the code, checked in code, and your files
+              are never edited.
             </p>
           </div>
         </div>
@@ -143,7 +144,7 @@ export default function Landing({ onEnter, theme, setTheme }) {
 
       <section id="tools" className="l-section">
         <div className="l-wrap">
-          <h2 className="l-h2">Three tools</h2>
+          <h2 className="l-h2">Three tools, one startup journey</h2>
           <div className="l-tools">
             {TOOLS.map((t) => (
               <article key={t.id} className="l-tool">
@@ -214,7 +215,7 @@ export default function Landing({ onEnter, theme, setTheme }) {
           <p className="l-note">Partly. This is what changes when agents, live sources and code checks work together.</p>
           <div className="l-table-wrap">
             <table className="l-compare">
-              <thead><tr><th /><th>Plain chatbot</th><th>Agentic Co-Pilot</th></tr></thead>
+              <thead><tr><th /><th>Plain chatbot</th><th>Boost Your Startup</th></tr></thead>
               <tbody>
                 {COMPARE.map(([k, a, b]) => <tr key={k}><th scope="row">{k}</th><td>{a}</td><td>{b}</td></tr>)}
               </tbody>
@@ -225,7 +226,7 @@ export default function Landing({ onEnter, theme, setTheme }) {
 
       <section className="l-section l-end">
         <div className="l-wrap l-end-inner">
-          <h2 className="l-h2">Try it with your own idea or project.</h2>
+          <h2 className="l-h2">Start with your idea. Finish launch-ready.</h2>
           <div className="row" style={{ gap: 12 }}>
             <button className="btn primary l-big" onClick={() => onEnter('startup')}>Check an idea</button>
             <button className="btn l-big" onClick={() => onEnter('code')}>Evaluate a codebase</button>
@@ -235,7 +236,7 @@ export default function Landing({ onEnter, theme, setTheme }) {
       </section>
 
       <footer className="l-wrap l-foot">
-        <span>Agentic AI Co-Pilot, by Ronak Dutta</span>
+        <span>Boost Your Startup (Agentic AI Co-Pilot), by Ronak Dutta</span>
         <span>Guide: Dr. Sanjay Kumar Singh, USAR, GGSIPU</span>
       </footer>
     </div>

@@ -151,7 +151,7 @@ CSS_CLASSES = (
 
 README = """# {title}
 
-A small generated prototype (FastAPI + one HTML page) made by the Agentic Co-Pilot's
+A small generated prototype (FastAPI + one HTML page) made by the Boost Your Startup
 Prototype Builder from the PRD's top requirements. It is a starting point, not a product.
 
 Files: main.py (fixed template), features.py, static/index.html and test_features.py

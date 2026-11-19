@@ -40,7 +40,7 @@ async def _lifespan(_app):
 
 
 app = FastAPI(
-    title="Agentic AI Co-Pilot API",
+    title="Boost Your Startup API",
     description="Multi-Agent RAG System for Idea Validation and Codebase Analysis",
     version="1.0.0",
     lifespan=_lifespan,
@@ -535,5 +535,5 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "8000"))
     reload_enabled = os.getenv("RELOAD", "1") not in ("0", "false", "False")
-    print(f"\n[Agentic Co-Pilot] Running at: http://localhost:{port} (http://127.0.0.1:{port})\n")
+    print(f"\n[Boost Your Startup] Running at: http://localhost:{port} (http://127.0.0.1:{port})\n")
     uvicorn.run("app:app", host=host, port=port, reload=reload_enabled)
