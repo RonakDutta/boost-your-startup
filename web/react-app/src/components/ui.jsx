@@ -43,13 +43,20 @@ export function Stat({ value, unit, label, children }) {
   )
 }
 
-export function More({ label = 'Show more', children }) {
+export function More({ label = 'Show more', children, open }) {
   return (
-    <details className="more">
+    <details className="more" open={open || undefined}>
       <summary>{label}</summary>
       <div style={{ marginTop: 10 }}>{children}</div>
     </details>
   )
+}
+
+/** Scrolls an element into view when `when` becomes true (no animation). */
+export function useScrollTo(id, when) {
+  useEffect(() => {
+    if (when) document.getElementById(id)?.scrollIntoView({ block: 'center' })
+  }, [id, when])
 }
 
 export function SafeLink({ href, children, ...rest }) {

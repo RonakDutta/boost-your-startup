@@ -243,6 +243,7 @@ Grounded prompts, deterministic critic with quote-vs-disk and compile checks, ho
 
 ### Phase 10: charts instead of text (same branch)
 - User: "use more graphs, it is a lot of text". Added `components/charts.jsx` and replaced text blocks with charts (see section 5). Tables moved behind "Table view". Checked in Chromium, light and dark, no sideways scroll at 390px.
+- Click-through ("click a chart item, land on it"): in the Failure Simulator, a kind bar, file bar or spread-graph box opens Failure points filtered to it (`focus {by: type|func|file|entry}` + "Show all" bar); research bars and "Research on this" scroll to and mark that kind's papers; "See the fix" marks the fix; "N found in your code" goes back. On the Research papers tab a paper's bar scrolls to it, marks it and opens its abstract. Marked items use the static `.picked` style (accent edge, no animation); `useScrollTo` scrolls without animation. All 9 paths checked in Chromium.
 - Research results chart shows the relevance filter honestly: per failure kind, results shown / also named the failure / left out (`research[].relevant` added).
 
 ### Measured numbers (real runs, keep updated)

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import TraceView from '../components/TraceView.jsx'
-import { Bar, More, SafeLink, Score, Source, Tabs, Tag, plainText } from '../components/ui.jsx'
+import { Bar, More, SafeLink, Score, Source, Tabs, Tag, plainText, useScrollTo } from '../components/ui.jsx'
 import { Columns, FlowGraph, HBars, SplitBar, yearColumns } from '../components/charts.jsx'
 
 const SEV_TONE = { high: 'risk', medium: 'warn', low: '' }
@@ -62,8 +62,14 @@ function SpreadGraph({ out, goTo }) {
   if (!findings.length) return null
   return (
     <div className="card pad stack">
-      <div className="row between"><h3>How a failure spreads</h3><span className="tiny muted">From the call graph, no AI. Hover a box to follow its path.</span></div>
-      <FlowGraph columns={columns} edges={[...edges].map((e) => e.split('|'))} onPick={() => goTo('points')} />
+      <div className="row between"><h3>How a failure spreads</h3><span className="tiny muted">From the call graph, no AI. Hover a box to follow its path, click it for details.</span></div>
+      <FlowGraph columns={columns} edges={[...edges].map((e) => e.split('|'))} onPick={(n) => {
+        const [kind, ...rest] = n.id.split(':')
+        const value = rest.join(':')
+        if (kind === 'k') goTo('points', { by: 'type', value, label: n.label })
+        else if (kind === 'f') goTo('points', { by: 'func', value, label: n.label })
+        else goTo('points', { by: 'entry', value, label: `reached from ${n.label}` })
+      }} />
     </div>
   )
 }
@@ -84,7 +90,7 @@ function Overview({ out, goTo }) {
   const fileRows = Object.entries(byFile)
     .map(([file, n]) => ({ key: file, label: file, value: n.high + n.medium + n.low,
       parts: [{ value: n.high, tone: 'risk' }, { value: n.medium, tone: 'warn' }, { value: n.low, tone: 'low' }],
-      tip: `${file}: ${n.high} high, ${n.medium} medium, ${n.low} low` }))
+      tip: `${file}: ${n.high} high, ${n.medium} medium, ${n.low} low. Click for details` }))
     .sort((x, y) => y.value - x.value)
   return (
     <div className="stack-lg">
@@ -112,12 +118,13 @@ function Overview({ out, goTo }) {
         <div className="card pad stack">
           <h3>Failure points by kind</h3>
           <HBars rows={(out.failure_types || []).map((t) => ({ key: t.type, label: t.title, sub: t.cwe, value: t.count, tone: SEV_CHART[t.severity],
-            tip: `${t.title} (${t.cwe}): ${t.count} found, ${t.severity}` }))} onPick={() => goTo('points')}
+            tip: `${t.title} (${t.cwe}): ${t.count} found, ${t.severity}. Click for details` }))}
+            onPick={(r) => goTo('points', { by: 'type', value: r.key, label: r.label })}
             legend={[{ label: 'High', tone: 'risk' }, { label: 'Medium', tone: 'warn' }, { label: 'Low', tone: 'low' }]} />
         </div>
         <div className="card pad stack">
           <div className="row between"><h3>Where they are</h3><span className="tiny muted">{c.files_scanned} files scanned</span></div>
-          <HBars rows={fileRows} labelWidth={170} legend={[{ label: 'High', tone: 'risk' }, { label: 'Medium', tone: 'warn' }, { label: 'Low', tone: 'low' }]} />
+          <HBars rows={fileRows} labelWidth={170} onPick={(r) => goTo('points', { by: 'file', value: r.key, label: r.key })} legend={[{ label: 'High', tone: 'risk' }, { label: 'Medium', tone: 'warn' }, { label: 'Low', tone: 'low' }]} />
         </div>
       </div>
 
@@ -159,9 +166,9 @@ function Overview({ out, goTo }) {
   )
 }
 
-function Point({ f }) {
+function Point({ f, goTo, hasFix }) {
   return (
-    <div className="card pad stack">
+    <div className="card pad stack" id={`point-${f.id}`}>
       <div className="row between">
         <div className="row">
           <span className="mono" style={{ fontWeight: 600 }}>{f.id}</span>
@@ -180,33 +187,55 @@ function Point({ f }) {
           {(f.entrypoints || []).length > 0 && <Tag tone="risk">{f.entrypoints.length} entry point{f.entrypoints.length > 1 ? 's' : ''}</Tag>}
         </div>
       )}
-      <More label="Show the code">
-        <Code code={f.context_code} start={f.context_start} mark={f.line} />
-      </More>
+      <div className="row">
+        <More label="Show the code">
+          <Code code={f.context_code} start={f.context_start} mark={f.line} />
+        </More>
+        <button type="button" className="chip" onClick={() => goTo('research', { by: 'type', value: f.type, label: f.title })}>Research on this</button>
+        {hasFix && <button type="button" className="chip" onClick={() => goTo('fixes', { by: 'type', value: f.type, label: f.title })}>See the fix</button>}
+      </div>
     </div>
   )
 }
 
-function Points({ out }) {
+const MATCH = {
+  type: (f, v) => f.type === v,
+  func: (f, v) => `${f.file_path}:${f.symbol}` === v,
+  file: (f, v) => f.file_path === v,
+  entry: (f, v) => (f.entrypoints || []).includes(v),
+}
+
+function Points({ out, focus, goTo }) {
   const [level, setLevel] = useState('all')
-  const list = (out.findings || []).filter((f) => level === 'all' || f.severity === level)
+  const all = out.findings || []
+  const focused = focus ? all.filter((f) => MATCH[focus.by]?.(f, focus.value)) : all
+  const list = focused.filter((f) => level === 'all' || f.severity === level)
+  const fixed = new Set((out.fixes || []).map((x) => (all.find((f) => f.id === x.id) || {}).type))
   return (
     <div className="stack-lg">
+      {focus && (
+        <div className="focus-bar">
+          <span>Showing {focused.length} failure point{focused.length === 1 ? '' : 's'}: <strong>{focus.label}</strong></span>
+          <button type="button" className="chip" onClick={() => goTo('points')}>Show all {all.length}</button>
+        </div>
+      )}
       <div className="row">
         {['all', 'high', 'medium', 'low'].map((l) => (
           <button key={l} className={`chip ${level === l ? 'on' : ''}`} onClick={() => setLevel(l)}>
-            {l === 'all' ? `All (${(out.findings || []).length})` : `${l} (${(out.counts || {})[l] || 0})`}
+            {l === 'all' ? `All (${focused.length})` : `${l} (${focused.filter((f) => f.severity === l).length})`}
           </button>
         ))}
         <span className="tiny muted">"If it fails" is built from the call graph, not by AI.</span>
       </div>
-      {list.map((f) => <Point key={f.id} f={f} />)}
+      {list.map((f) => <Point key={f.id} f={f} goTo={goTo} hasFix={fixed.has(f.type)} />)}
       {!list.length && <div className="empty">Nothing at this level.</div>}
     </div>
   )
 }
 
-function Research({ out }) {
+function Research({ out, focus, goTo }) {
+  const picked = focus?.by === 'type' ? focus.value : null
+  useScrollTo(`research-${picked}`, !!picked)
   const groups = out.research || []
   const all = groups.flatMap((g) => g.papers.map((p) => ({ ...p, kind: g.title })))
   const yearData = yearColumns(all)
@@ -224,7 +253,8 @@ function Research({ out }) {
                 parts: [{ value: g.papers.length, tone: 'accent' }, { value: relevant - g.papers.length, tone: 'info' }, { value: g.dropped, tone: 'var(--line-strong)' }],
                 display: `${relevant} of ${relevant + g.dropped}`,
                 tip: `${g.title}: ${relevant + g.dropped} results, ${relevant} named the failure, best ${g.papers.length} shown` }
-            })} legend={[{ label: 'Shown (best match)', tone: 'accent' }, { label: 'Also named the failure', tone: 'info' }, { label: 'Left out', tone: 'var(--line-strong)' }]} />
+            })} onPick={(r) => goTo('research', { by: 'type', value: r.key, label: r.label })}
+            legend={[{ label: 'Shown (best match)', tone: 'accent' }, { label: 'Also named the failure', tone: 'info' }, { label: 'Left out', tone: 'var(--line-strong)' }]} />
           </div>
           <div className="card pad stack">
             <div className="row between"><h3>When they were published</h3><span className="tiny muted">{all.length} papers, {span[0]} to {span[span.length - 1]}</span></div>
@@ -236,9 +266,10 @@ function Research({ out }) {
       {groups.map((g) => {
         const t = (out.failure_types || []).find((x) => x.type === g.type) || {}
         return (
-          <div key={g.type} className="card pad stack">
+          <div key={g.type} id={`research-${g.type}`} className={`card pad stack ${picked === g.type ? 'picked' : ''}`}>
             <div className="row between">
-              <div className="row"><h3>{g.title}</h3><Cwe id={t.cwe} /><Tag tone={SEV_TONE[t.severity]}>{t.count} found</Tag></div>
+              <div className="row"><h3>{g.title}</h3><Cwe id={t.cwe} />
+                <button type="button" className="chip" onClick={() => goTo('points', { by: 'type', value: g.type, label: g.title })}>{t.count} found in your code</button></div>
               <span className="tiny muted">Searched: {g.queries.join(' · ')}</span>
             </div>
             {g.papers.map((p, i) => (
@@ -275,11 +306,11 @@ function Research({ out }) {
   )
 }
 
-function FixCard({ x, f }) {
+function FixCard({ x, f, picked }) {
   const ai = x.generated_by === 'llm'
   const k = x.checks || {}
   return (
-    <div className="card pad-lg stack">
+    <div className={`card pad-lg stack ${picked ? 'picked' : ''}`} id={`fix-${f?.type}`}>
       <div className="row between">
         <div className="row">
           <span className="mono" style={{ fontWeight: 600 }}>{x.id}</span>
@@ -318,8 +349,10 @@ function FixCard({ x, f }) {
   )
 }
 
-function Fixes({ out }) {
+function Fixes({ out, focus }) {
   const byId = Object.fromEntries((out.findings || []).map((f) => [f.id, f]))
+  const picked = focus?.by === 'type' ? focus.value : null
+  useScrollTo(`fix-${picked}`, !!picked)
   const v = out.verification || {}
   return (
     <div className="stack-lg">
@@ -334,7 +367,7 @@ function Fixes({ out }) {
         </div>
       )}
       <div className="tiny muted">One fix per kind of failure, most serious first. Nothing is applied to your files.</div>
-      {(out.fixes || []).map((x) => <FixCard key={x.id} x={x} f={byId[x.id]} />)}
+      {(out.fixes || []).map((x) => <FixCard key={x.id} x={x} f={byId[x.id]} picked={picked && byId[x.id]?.type === picked} />)}
       {!(out.fixes || []).length && <div className="empty">No failure points, so nothing to fix.</div>}
       {out.fallback_reason && <div className="tiny muted">AI fixes not available: {plainText(out.fallback_reason)}</div>}
     </div>
@@ -345,9 +378,12 @@ export default function FailureResult({ run }) {
   const state = run.result
   const out = state.final_output || {}
   const [tab, setTab] = useState('overview')
+  const [focus, setFocus] = useState(null)
   if (out.type === 'error' || out.error) {
     return <div className="card pad"><h3>Could not run</h3><p className="small muted">{out.error}</p></div>
   }
+  // Clicking a chart item opens a tab focused on that item.
+  const go = (id, f = null) => { setTab(id); setFocus(f) }
   const papers = (out.research || []).reduce((n, g) => n + g.papers.length, 0)
   const tabs = [
     { id: 'overview', label: 'Overview' },
@@ -359,11 +395,11 @@ export default function FailureResult({ run }) {
   return (
     <div className="stack-lg fade-in">
       <div className="eyebrow">Report · session {state.session_id}</div>
-      <Tabs tabs={tabs} value={tab} onChange={setTab} />
-      {tab === 'overview' && <Overview out={out} goTo={setTab} />}
-      {tab === 'points' && <Points out={out} />}
-      {tab === 'research' && <Research out={out} />}
-      {tab === 'fixes' && <Fixes out={out} />}
+      <Tabs tabs={tabs} value={tab} onChange={(id) => go(id)} />
+      {tab === 'overview' && <Overview out={out} goTo={go} />}
+      {tab === 'points' && <Points out={out} focus={focus} goTo={go} />}
+      {tab === 'research' && <Research out={out} focus={focus} goTo={go} />}
+      {tab === 'fixes' && <Fixes out={out} focus={focus} />}
       {tab === 'trace' && <TraceView state={state} calls={run.calls} />}
     </div>
   )

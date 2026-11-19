@@ -1,4 +1,5 @@
-import { Bar, More, SafeLink, Source, Tag, downloadText } from '../components/ui.jsx'
+import { useState } from 'react'
+import { Bar, More, SafeLink, Source, Tag, downloadText, useScrollTo } from '../components/ui.jsx'
 import { Columns, HBars, SplitBar, yearColumns } from '../components/charts.jsx'
 
 const SOURCE_NAMES = { arxiv: 'arXiv', semantic_scholar: 'Semantic Scholar', openalex: 'OpenAlex' }
@@ -124,17 +125,22 @@ export function Spotlight({ pa }) {
   )
 }
 
-function PaperList({ papers }) {
+function PaperList({ papers, picked }) {
+  useScrollTo(`paper-${picked?.ref}`, !!picked)
   return (
     <div className="card pad">
       {papers.map((p) => (
-        <div className="paper" key={p.ref_id}>
+        <div className={`paper ${picked?.ref === p.ref_id ? 'picked' : ''}`} key={p.ref_id} id={`paper-${p.ref_id}`}>
           <span className="ref">{p.ref_id}</span>
           <div style={{ minWidth: 0 }}>
             <SafeLink href={p.url} className="paper-title">{p.title}</SafeLink>
             <div className="tiny muted">{authors(p.authors)} · {p.year || 'n.d.'} · {[p.source, ...(p.also_found_in || [])].map(sourceName).join(', ')}</div>
             <PaperLinks p={p} />
-            {p.abstract && <More label="Abstract"><p className="small muted" style={{ margin: 0 }}>{p.abstract}</p></More>}
+            {p.abstract && (
+              <More key={picked?.ref === p.ref_id ? picked.n : 'closed'} label="Abstract" open={picked?.ref === p.ref_id}>
+                <p className="small muted" style={{ margin: 0 }}>{p.abstract}</p>
+              </More>
+            )}
           </div>
           <div className="sim">
             <div className="row between tiny"><span className="muted">similarity</span><span className="mono">{p.similarity.toFixed(2)}</span></div>
@@ -206,6 +212,7 @@ export default function Papers({ pa, title }) {
       </div>
     )
   }
+  const [picked, setPicked] = useState(null)
   const slug = (title || 'idea').toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 40)
   return (
     <div className="stack-lg">
@@ -230,9 +237,9 @@ export default function Papers({ pa, title }) {
       <div className="grid g2">
         <div className="card pad stack">
           <div className="row between"><h3>How close each paper is</h3><span className="tiny muted">similarity to your idea ({pa.similarity_backend?.startsWith('MiniLM') ? 'MiniLM' : 'TF-IDF'})</span></div>
-          <HBars labelWidth={250} unit="%" rows={papers.map((p) => ({
+          <HBars labelWidth={250} unit="%" onPick={(r) => setPicked({ ref: r.key, n: Date.now() })} rows={papers.map((p) => ({
             key: p.ref_id, label: `${p.ref_id} · ${p.title}`, sub: `${p.year || 'n.d.'} · ${sourceName(p.source)}`,
-            value: Math.round(p.similarity * 100), tone: 'info', tip: `${p.ref_id}: ${p.title} (${Math.round(p.similarity * 100)}%)`,
+            value: Math.round(p.similarity * 100), tone: 'info', tip: `${p.ref_id}: ${p.title} (${Math.round(p.similarity * 100)}%). Click to open it`,
           }))} />
         </div>
         <div className="card pad stack">
@@ -243,7 +250,7 @@ export default function Papers({ pa, title }) {
       </div>
       <div className="stack">
         <h3>All papers we compared against</h3>
-        <PaperList papers={papers} />
+        <PaperList papers={papers} picked={picked} />
       </div>
       {(pa.comparisons || []).length > 0 && <Comparisons pa={pa} />}
       {(pa.research_gap || pa.positioning) && (
