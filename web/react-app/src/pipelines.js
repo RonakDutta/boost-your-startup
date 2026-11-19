@@ -33,7 +33,7 @@ export const PROTOTYPE_PIPELINE = {
   rows: 2,
   nodes: [
     { id: 'spec', label: 'Pick features', sub: 'From the PRD', agents: ['Spec Planner'], col: 0, row: 0, deps: [] },
-    { id: 'write', label: 'Write code', sub: 'AI, 1 call', agents: ['Code Writer'], col: 1, row: 0, deps: ['spec'] },
+    { id: 'write', label: 'Write code', sub: 'AI design + code', agents: ['Code Writer'], col: 1, row: 0, deps: ['spec'] },
     { id: 'safety', label: 'Safety check', sub: 'Code, no AI', agents: ['Safety Check'], col: 2, row: 0, deps: ['write'], star: true, warn: 'problem found' },
     { id: 'compile', label: 'Compile', sub: 'Code, no AI', agents: ['Compiler'], col: 3, row: 0, deps: ['safety'], warn: 'problem found' },
     { id: 'tests', label: 'Run tests', sub: 'pytest', agents: ['Test Runner'], col: 4, row: 0, deps: ['compile'], warn: 'problem found' },

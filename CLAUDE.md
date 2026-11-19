@@ -42,7 +42,7 @@ The user's goal: **impress teachers in a viva**. That only works if everything s
 ```bash
 pip install -r requirements.txt
 python app.py                                   # http://127.0.0.1:8000  (new UI at /, old UI at /legacy)
-GROQ_API_KEY= pytest -q                         # 122 pass, 3 live smoke tests skip without a key
+GROQ_API_KEY= pytest -q                         # 129 pass, 3 live smoke tests skip without a key
 python evaluation/compare_baseline.py           # naive vs AST chunking (computed)
 python evaluation/retrieval_benchmark.py        # BM25 / vector / hybrid Top-1, Top-3, MRR
 python evaluation/free_tier_budget.py           # token plan vs the model limits (no quota used)
@@ -75,7 +75,10 @@ Idea brief ─┬─ Market search (web) ── Devil's advocate ── Judge �
   → Critic (no AI: file, symbol, lines, retrieved, quote-vs-disk, fix compiles) → at most one revision
 ```
 
-### Prototype Builder (`agents/prototype_agent.py` + `tools/prototype_sandbox.py`)
+### Prototype Builder (`agents/prototype_agent.py` + `agents/prototype_blueprints.py` + `tools/prototype_sandbox.py`)
+**Normal path (Phase 8):** the AI makes ONE small JSON "app design" call (`DESIGN_PROMPT`, ~2.2k max tokens): kind (`monitor` readings per group with spike/threshold flags, `review` text/code scored against checks, `tracker` statuses, `booking` slots with no double booking), fields, 3-12 sample records and the rule. `blueprints.normalize()` cleans it (field names, limits, conflicting checks, double-booked seeds) and `blueprints.render()` generates features.py, index.html and test_features.py (7-9 tests that pass by construction). No Code Fixer call is needed. AI down → `default_design()` picks a kind from keywords in the idea (the 3 demo ideas: water meter and energy → monitor, AI code reviewer → review), labelled fallback. AI answers `"kind": "custom"` → the old full-code path below. **The UI never says "template"**: files show "Generated for this idea" (`written_by: generated`), main.py shows "Base server file" (user's choice, Nov 2026).
+
+Full-code path (only for "custom"):
 ```
 PRD (session) → Spec Planner (top 3 requirements, code) → Code Writer (1 AI call: features.py, static/index.html, test_features.py)
   → Safety Check (AST import allowlist, no eval/exec/open/dunders, no outside scripts) → Compiler → Page Check (page /api paths vs routes) → Test Runner (pytest subprocess)
@@ -104,7 +107,7 @@ PRD (session) → Spec Planner (top 3 requirements, code) → Code Writer (1 AI 
 ### `final_output` data contract (what the UI reads)
 - **Idea:** `project_title`, `problem_statement`, `core_value_prop`, `target_personas`, `mvp_features`, `competitors[]`, `tech_stack{layer: {choice, rationale, tradeoffs}}`, `citations[] (is_live)`, `scorecard{total_score, verdict, verdict_summary, categories[], evidence_confidence, ...}`, `kill_report{fatal_flaws[], bear_case_summary, ...}`, `reconciliation{verdict, must_have_mitigations, key_tradeoffs}`, `prd{product_vision, user_stories, functional_requirements, *_diagram_mermaid}`, `phases[]`, `risks[]`, **`prior_art`** (below), `provenance{section: llm|fallback|deterministic}`, `sections_13` (14 entries when prior art ran), `full_report_markdown`.
 - **`prior_art`:** `papers[]{ref_id, title, authors, year, venue, abstract, url, pdf_url, doi, source, also_found_in, citation_count, similarity}`, `novelty_index`, `novelty_band`, `closest_similarity`, `evidence_confidence`, `similarity_backend`, `search_backend`, `queries`, `comparisons[]{ref, what_it_does, overlap, paper_is_stronger_at, idea_adds, overlap_level, abstract_support}`, `research_gap`, `positioning`, `related_work`, `ieee_references[]`, `bibtex`, `similarity_map[]{label, x, y, is_idea, similarity}`, `verification{comparisons_kept, invalid_refs_dropped, citations_removed, avg_abstract_support}`, `notes[]`, `generation_source`.
-- **Prototype build:** `id`, `title`, `path`, `generation_source`, `fallback_reason`, `repaired`, `spec{requirements[]}`, `files[]{path, lines, written_by: ai|fallback|template, content}`, `checks{safety_ok, compile_ok, tests{ok, passed, failed, errors, total, output, duration_ms}, server{ok, url, port, ms, error}, endpoints[]{method, path, status|null, ms}}`. Monitor status: `state (running|crashed|stopped)`, `url`, `uptime_s`, `auto_stop_in_s`, `requests_visitors`, `requests_checks`, `server_errors`, `client_errors`, `avg_ms`, `recent[]`, `recent_errors[]`, `server_log[]`.
+- **Prototype build:** `id`, `title`, `path`, `generation_source`, `fallback_reason`, `repaired`, `build_mode (design|full)`, `app_kind`, `spec{requirements[]}`, `files[]{path, lines, written_by: generated|ai|fallback|template, content}`, `checks{safety_ok, compile_ok, tests{ok, passed, failed, errors, total, output, duration_ms}, server{ok, url, port, ms, error}, endpoints[]{method, path, status|null, ms}}`. Monitor status: `state (running|crashed|stopped)`, `url`, `uptime_s`, `auto_stop_in_s`, `requests_visitors`, `requests_checks`, `server_errors`, `client_errors`, `avg_ms`, `recent[]`, `recent_errors[]`, `server_log[]`.
 - **Code:** `summary`, `question_mode`, `candidates[]{rank, file_path, symbol_name, line_start, line_end, confidence, why_problematic, wrong_code, recommended_pattern, explanation_of_change, generated_by, verification{file_exists, symbol_exists, lines_in_bounds, in_retrieved_evidence, quote_matches_disk, fix_compiles}}`, `critic{grounding_score, is_valid, total_checked, total_verified, code_quote_matches, fixes_compiling, fixes_checked, flags}`, `impact{target_symbol, risk_level, blast_radius_score, direct_callers[], indirect_callers[], affected_tests, affected_entrypoints, mermaid_diagram, recommendations}`, `flow{hops[]}`, `retrieved_locations[]`, `indexed_summary`, `retrieval_backend`, `local_repo_path`.
 
 ---
@@ -203,6 +206,13 @@ Grounded prompts, deterministic critic with quote-vs-disk and compile checks, ho
 - Fallback idea title from the idea text ("Split Shared Grocery Bills", not "A Mobile App That"); Research papers tab says "Not checked" when the comparison fell back.
 - Landing page uses the mid-term report: course ARP-455, student, guide, session, research gap (report 3.1), "Built on this research" with arXiv links (ids checked against arxiv.org).
 
+### Phase 8: prototype app designs (branch `claude/pensive-darwin-8pzpug`)
+- Prototype Builder now asks the AI for a short JSON app design instead of three code files (see section 4). One call of at most 2.2k tokens instead of 4.8k + 4k; the generated tests pass by construction.
+- Without the AI, the three demo ideas still get a fitting app (water meter / energy: readings per flat with spike alerts; AI code reviewer: submissions scored on docstring, print, bare except, line length, length), labelled fallback. Checked in Chromium (screenshots of all three).
+- UI wording: "Code generated from your idea", "Generated for this idea", "Base server file"; no "template" on screen.
+- Tests: 129 pass (`tests/test_prototype.py`: design path, AI-down keyword path, the 3 demo ideas + a tracker run their own generated tests, messy designs cleaned or rejected).
+- **Not yet checked with a real key:** run the 3 demo ideas on the laptop and look at the AI's design (names, sample data).
+
 ### Measured numbers (real runs, keep updated)
 - Live idea run (Oct 2026, cloud, real key): 7 calls, ~16k tokens, 13 s, no fallbacks; every answer `finish_reason=stop` and used about half its max_tokens. Devil's advocate, Judge and PRD went to gpt-oss-20b because gpt-oss-120b's 8k/minute was used by the parallel steps (by design).
 - Code runs on `sample_repo`: 1 call, ~2.5k tokens, 3-13 s.
@@ -215,6 +225,8 @@ Grounded prompts, deterministic critic with quote-vs-disk and compile checks, ho
 ---
 
 ## 8. What is left and what needs improvement (start here next session)
+
+**Next feature (agreed with the user, Nov 2026): Failure Simulator, a new top-level tool.** Keep it modest and research-led ("focus less on tech, more on research"): scan a repo (or the prototype just built) with fixed checks for failure points, then for each one show the weakness type (CWE), real papers about that kind of failure from the existing paper search, and a suggested fix. No live fault injection or heavy tooling. Planned top bar: Idea Check · Prototype · Code Review · Failure Simulator.
 
 **Must fix / verify next (in this order)**
 - **Live check of all three demo ideas** (one prototype checked live in Phase 5): run the three demo ideas, then build a prototype for each. Check the generated page looks right, tests pass, the Code Fixer works when needed, and the monitor counts clicks in the preview. Record pass rate, tokens and build time under "Measured numbers" (real numbers only).

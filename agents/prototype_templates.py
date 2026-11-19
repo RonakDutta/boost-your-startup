@@ -113,12 +113,17 @@ th { color: #656d76; font-weight: 600; font-size: 13px; }
 .tag.bad { background: #ffebe9; color: #a40e26; }
 .empty { color: #656d76; padding: 12px 0; }
 .error { color: #a40e26; font-size: 13px; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.list-row { padding: 8px 0; border-bottom: 1px solid #eceef1; }
+.list-row:last-child { border-bottom: 0; }
+.bar { height: 6px; background: #eef1f4; border-radius: 3px; margin-top: 6px; }
+.bar > span { display: block; height: 100%; background: #1f6feb; border-radius: 3px; }
 """
 
 # Classes the AI is told it may use (kept next to the stylesheet so they agree).
 CSS_CLASSES = (
     "top, wrap, brand, card, grid, row, stat, field, btn, btn primary, btn small, "
-    "muted, list, tag, tag good, tag warn, tag bad, empty, error; plain table/th/td"
+    "muted, list, tag, tag good, tag warn, tag bad, empty, error, cols, list-row, bar; plain table/th/td"
 )
 
 README = """# {title}

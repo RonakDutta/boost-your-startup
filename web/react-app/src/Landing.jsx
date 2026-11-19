@@ -13,7 +13,7 @@ const PROJECT = [
 
 // Facts about how the system is built. Keep them true: if the code changes, change these.
 const SHEET = [
-  ['AI calls per idea run', '7, plus 1 or 2 for a prototype'],
+  ['AI calls per idea run', '7, plus usually 1 for a prototype'],
   ['Paper sources', 'arXiv, Semantic Scholar, OpenAlex (live)'],
   ['Idea score', '7-category rubric, computed in code'],
   ['Code search', 'BM25 keywords + MiniLM embeddings'],
