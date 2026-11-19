@@ -60,8 +60,16 @@ function readTheme() {
   try { return localStorage.getItem('copilot-theme') || 'light' } catch { return 'light' }
 }
 
-function Header({ pillar, setPillar, theme, setTheme, onHome }) {
+const TOOLS = [
+  ['startup', 'Startup Assistance'],
+  ['code', 'Codebase Evaluation'],
+  ['failure', 'Failure Simulator'],
+]
+
+/** A small note in the corner, only when the AI engine or the server is not available. */
+function EngineToast() {
   const [health, setHealth] = useState(null)
+  const [closed, setClosed] = useState(() => { try { return sessionStorage.getItem('copilot-toast') || '' } catch { return '' } })
   useEffect(() => {
     let alive = true
     const load = () => getJSON('/api/health').then((h) => alive && setHealth(h)).catch(() => alive && setHealth(false))
@@ -69,30 +77,33 @@ function Header({ pillar, setPillar, theme, setTheme, onHome }) {
     const t = setInterval(load, 20000)
     return () => { alive = false; clearInterval(t) }
   }, [])
-  let status = <>Connecting...</>
-  if (health === false) status = <span className="state risk">Server offline</span>
-  else if (health) {
-    const m = health.metrics || {}
-    status = m.llm_configured
-      ? <>{health.rate_limits?.all_rate_limited ? <span className="state warn">Engine busy</span> : <span className="state good">Engine ready</span>} · {health.model_chain?.length} models · {m.total_calls || 0} AI calls served{m.cache_hits ? `, ${m.cache_hits} from cache` : ''}</>
-      : <span className="state warn">AI engine offline: built-in fallbacks</span>
-  }
+  let note = null
+  if (health === false) note = ['offline', 'risk', 'The server is not reachable. Start it with python app.py.']
+  else if (health && !health.metrics?.llm_configured) note = ['fallback', 'warn', 'The AI engine is off. Steps that need it use built-in fallbacks, and the results say so.']
+  else if (health?.rate_limits?.all_rate_limited) note = ['busy', 'warn', 'The AI engine is busy. A run may wait a little or use labelled fallbacks.']
+  if (!note || closed === note[0]) return null
+  const close = () => { setClosed(note[0]); try { sessionStorage.setItem('copilot-toast', note[0]) } catch { /* private mode */ } }
+  return (
+    <div className={`toast ${note[1]}`} role="status">
+      <span>{note[2]}</span>
+      <button type="button" aria-label="Close" onClick={close}>×</button>
+    </div>
+  )
+}
+
+function Header({ pillar, setPillar, theme, setTheme, onHome }) {
   return (
     <header className="topbar">
       <div className="topbar-inner">
-        <div className="brand">
-          <div className="brand-mark" aria-hidden="true">AC</div>
-          <div>
-            <button className="brand-name link" onClick={onHome} title="Back to the start page">Agentic Co-Pilot</button>
-            <div className="brand-sub">Multi-agent AI · GGSIPU USAR minor project</div>
-          </div>
-        </div>
-        <div className="switch" role="tablist" aria-label="Choose a tool">
-          <button className={pillar === 'startup' ? 'on' : ''} onClick={() => setPillar('startup')}>Startup Assistance</button>
-          <button className={pillar === 'code' ? 'on' : ''} onClick={() => setPillar('code')}>Codebase Evaluation</button>
-          <button className={pillar === 'failure' ? 'on' : ''} onClick={() => setPillar('failure')}>Failure Simulator</button>
-        </div>
-        <div className="engine">{status}</div>
+        <button className="brand link" onClick={onHome} title="Back to the start page">
+          <span className="brand-name">Agentic Co-Pilot</span>
+          <span className="brand-sub">Minor project · GGSIPU USAR</span>
+        </button>
+        <nav className="nav-tabs" role="tablist" aria-label="Choose a tool">
+          {TOOLS.map(([id, label]) => (
+            <button key={id} role="tab" aria-selected={pillar === id} className={pillar === id ? 'on' : ''} onClick={() => setPillar(id)}>{label}</button>
+          ))}
+        </nav>
         <button className="icon-btn" aria-label="Toggle dark mode" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
           {theme === 'dark' ? '☀' : '☾'}
         </button>
@@ -186,7 +197,7 @@ function CodePage() {
         </div>
       )}
       <div className="card composer" style={{ marginTop: run ? 24 : 0 }}>
-        <div className="row" style={{ flexWrap: 'nowrap' }}>
+        <div className="repo-row">
           <input className="input mono" value={repo} onChange={(e) => { setRepo(e.target.value); setScan(null) }} placeholder="C:/path/to/project  or  https://github.com/owner/repo" />
           <button className="btn" onClick={() => inspect()} disabled={!repo.trim() || scan?.busy}>{scan?.busy ? (isUrl ? 'Cloning...' : 'Scanning...') : 'Scan'}</button>
           <button className="btn" onClick={useDemo}>Demo repo</button>
@@ -258,7 +269,7 @@ function FailurePage() {
         </div>
       )}
       <div className="card composer" style={{ marginTop: run ? 24 : 0 }}>
-        <div className="row" style={{ flexWrap: 'nowrap' }}>
+        <div className="repo-row">
           <input className="input mono" value={repo} onChange={(e) => { setRepo(e.target.value); setScan(null) }} placeholder="C:/path/to/project  or  https://github.com/owner/repo" />
           <button className="btn" onClick={() => inspect()} disabled={!repo.trim() || scan?.busy}>{scan?.busy ? (isUrl ? 'Cloning...' : 'Scanning...') : 'Scan'}</button>
           <button className="btn" onClick={useDemo}>Demo startup repo</button>
@@ -319,6 +330,7 @@ export default function App() {
   return (
     <>
       <Header pillar={pillar} setPillar={setPillar} theme={theme} setTheme={setTheme} onHome={home} />
+      <EngineToast />
       <main className="shell">
         {/* Both pages stay mounted so a running review keeps going when you switch. */}
         <div hidden={pillar !== 'startup'}><StartupPage /></div>

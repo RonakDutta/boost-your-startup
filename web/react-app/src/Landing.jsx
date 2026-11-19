@@ -88,7 +88,6 @@ export default function Landing({ onEnter, theme, setTheme }) {
       <nav className="l-nav">
         <div className="l-wrap l-nav-inner">
           <button className="l-brand" onClick={() => window.scrollTo({ top: 0 })}>
-            <span className="brand-mark" aria-hidden="true">AC</span>
             <span>Agentic Co-Pilot</span>
           </button>
           <div className="l-links">

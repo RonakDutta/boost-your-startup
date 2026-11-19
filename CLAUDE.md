@@ -30,7 +30,7 @@ The user's goal: **impress teachers in a viva**. The teachers care mostly about 
 - No pill shapes, no status dots, no pulsing or animated effects, no gradients, no uppercase letter-spaced labels, no fancy or serif display fonts, no arrows in buttons, no glow/shadows. Flat, square-ish corners (4-6px). Fonts: the computer's own system font (Segoe UI / San Francisco / Roboto) and system mono (Consolas / Menlo) for code only. The user rejected Inter and the bundled web fonts as "Claude-style"; do not add web fonts back.
 - **Less text.** The teacher did not read long pages last time. Numbers and short labels first; details behind "Show more" / "How is this computed?".
 - **Language:** easy to read but not childish. Keep a few real terms (AST, embeddings, call graph, novelty index) with a short explanation; no heavy jargon or buzzwords; no em dashes in user-facing text.
-- **Do not show that the app uses an external API.** No "Groq", "free tier", "free tokens", "API key" or rate-limit wording in the new UI. Use neutral wording ("Engine ready", "AI model", "Engine busy"). Model ids are shown without the provider prefix (`modelName()` in `ui.jsx`); backend step text goes through `plainText()`.
+- **Do not show that the app uses an external API.** No "Groq", "free tier", "free tokens", "API key" or rate-limit wording in the new UI. Use neutral wording ("AI engine", "AI model", "busy"). Engine state is only shown as a corner toast when something is wrong, never as a header line. Model ids are shown without the provider prefix (`modelName()` in `ui.jsx`); backend step text goes through `plainText()`.
 
 **Process**
 - Push finished work to the session branch quickly, and record it in this file (Status + Backlog).
@@ -149,7 +149,7 @@ PRD (session) → Spec Planner (top 3 requirements, code) → Code Writer (1 AI 
 
 **New UI (`web/react-app/src`, React 18 + Vite, no Tailwind, system fonts, no web fonts)**
 - `Landing.jsx`: start page at `/` (project sheet, two tools, the real pipeline graphs, chatbot comparison table). "Open the app" goes to `#/app` (or `#/app/code`); clicking the name in the app header goes back. Keep its facts true when the pipeline changes.
-- `App.jsx`: header (pillar switch, engine status, theme toggle), `StartupPage`, `CodePage`, "Why not just ask a chatbot?" cards. Both pages stay mounted so a run survives switching. `useRun.js`: SSE run state (`useRun(url)`, also used for prototype builds).
+- `App.jsx`: header (project name, three plain text tabs with an accent underline, theme toggle; no logo mark, no engine line: user, Nov 2026). `EngineToast` shows a small dismissable note in the corner only when the server is offline, the AI engine is off, or it is busy (closed state kept per browser session). `StartupPage`, `CodePage`, "Why not just ask a chatbot?" cards. Both pages stay mounted so a run survives switching. `useRun.js`: SSE run state (`useRun(url)`, also used for prototype builds).
 - `api.js`: `streamRun()` (fetch + SSE parser), `getJSON`, `postJSON`.
 - `pipelines.js`: graph definitions matched to trace `agent_name`s; `nodeStates()` derives done / working / fallback from real events and the dependency graph.
 - `components/charts.jsx`: flat charts with a hover readout, theme colours only (works in dark mode): `HBars` (incl. stacked `parts` + `legend`), `SplitBar`, `Columns`, `yearColumns()`, `Timeline`, `FlowGraph` (columns of nodes + edges, hover highlights a path). Used by the Failure Simulator (points split, kinds, files, spread graph, research results, years, fix checks), Research papers tab (similarity per paper, papers per year, overlap split) and Plan tab (roadmap timeline). Follow the dataviz rules: thin bars (14px), 4px rounded ends, 2px gaps in stacks, legend for 2+ series, text never in the data colour, no rings/gauges, details in "Table view".
@@ -245,6 +245,9 @@ Grounded prompts, deterministic critic with quote-vs-disk and compile checks, ho
 - User: "use more graphs, it is a lot of text". Added `components/charts.jsx` and replaced text blocks with charts (see section 5). Tables moved behind "Table view". Checked in Chromium, light and dark, no sideways scroll at 390px.
 - Click-through ("click a chart item, land on it"): in the Failure Simulator, a kind bar, file bar or spread-graph box opens Failure points filtered to it (`focus {by: type|func|file|entry}` + "Show all" bar); research bars and "Research on this" scroll to and mark that kind's papers; "See the fix" marks the fix; "N found in your code" goes back. On the Research papers tab a paper's bar scrolls to it, marks it and opens its abstract. Marked items use the static `.picked` style (accent edge, no animation); `useScrollTo` scrolls without animation. All 9 paths checked in Chromium.
 - Research results chart shows the relevance filter honestly: per failure kind, results shown / also named the failure / left out (`research[].relevant` added).
+
+### Phase 11: header (same branch)
+- Header redone: no "AC" logo mark (also removed from the landing nav; the favicon still uses it), the three tools as text tabs, engine status moved to a toast. Phones: tabs share the width on their own row; the repo field wraps (`.repo-row`). Checked light, dark and 390px.
 
 ### Measured numbers (real runs, keep updated)
 - Live idea run (Oct 2026, cloud, real key): 7 calls, ~16k tokens, 13 s, no fallbacks; every answer `finish_reason=stop` and used about half its max_tokens. Devil's advocate, Judge and PRD went to gpt-oss-20b because gpt-oss-120b's 8k/minute was used by the parallel steps (by design).
