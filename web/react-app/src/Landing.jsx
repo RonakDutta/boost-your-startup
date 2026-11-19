@@ -1,5 +1,5 @@
 import PipelineGraph from './components/PipelineGraph.jsx'
-import { CODE_PIPELINE, STARTUP_PIPELINE } from './pipelines.js'
+import { CODE_PIPELINE, FAILURE_PIPELINE, STARTUP_PIPELINE } from './pipelines.js'
 
 // From the project report (cover page).
 const PROJECT = [
@@ -17,17 +17,21 @@ const SHEET = [
   ['Paper sources', 'arXiv, Semantic Scholar, OpenAlex (live)'],
   ['Idea score', '7-category rubric, computed in code'],
   ['Code search', 'BM25 keywords + MiniLM embeddings'],
+  ['Failure checks', '11 fixed checks, each named by its CWE weakness type'],
+  ['Research per failure', 'Live paper search; a paper is kept only if it names the failure'],
   ['Prototype', 'FastAPI + one page, tested with pytest'],
   ['Runs on', 'One Python server on this computer'],
 ]
 
-// Literature survey of the report; arXiv ids checked against arxiv.org.
+// Literature survey of the report; arXiv ids checked against arxiv.org, other links opened and checked.
 const PAPERS = [
   ['Lewis et al., 2020', 'Retrieval-Augmented Generation', '2005.11401', 'Answers are built from retrieved code and papers, not from memory'],
   ['Zhang et al., 2024', 'AutoCodeRover', '2404.05427', 'Code is split at function and class boundaries (AST), not into text blocks'],
   ['Jimenez et al., 2024', 'SWE-bench', '2310.06770', 'The task: point to the file and lines behind a real issue'],
   ['Shinn et al., 2023', 'Reflexion', '2303.11366', 'A critic checks the answer and allows one revision'],
   ['Wu et al., 2023', 'AutoGen', '2308.08155', 'Separate agents with one job each, such as devil\'s advocate and judge'],
+  ['Yuan et al., OSDI 2014', 'Simple Testing Can Prevent Most Critical Failures', 'https://www.usenix.org/conference/osdi14/technical-sessions/presentation/yuan', 'Most catastrophic failures they studied came from badly handled errors, so ignored errors are rated high'],
+  ['MITRE', 'CWE: Common Weakness Enumeration', 'https://cwe.mitre.org/', 'Every failure check is named by its public CWE weakness type'],
 ]
 
 const TOOLS = [
@@ -55,6 +59,18 @@ const TOOLS = [
       'A critic checks file, lines and quoted code against the disk',
     ],
   },
+  {
+    id: 'failure',
+    n: '3',
+    name: 'Failure Simulator',
+    line: 'Where will this code fail on launch day, and what does research say about it?',
+    steps: [
+      'Fixed checks find failure points, each named by its CWE type',
+      'The call graph shows which features each failure would break',
+      'Live research papers on every kind of failure found',
+      'Suggested fixes, checked in code before you see them',
+    ],
+  },
 ]
 
 const COMPARE = [
@@ -62,6 +78,7 @@ const COMPARE = [
   ['Scores', 'Change each time you ask', 'Same formula in code, same score'],
   ['Code questions', 'Sees only the snippet you paste', 'Reads the whole project and checks line numbers on disk'],
   ['Prototype', 'Gives code you still have to run', 'Writes it, runs the tests, starts it, watches it'],
+  ['Failure points', 'Gives general advice', 'Named checks find them; papers back each kind; every fix is checked'],
   ['When the AI fails', 'Still answers confidently', 'Falls back to plain code and says so'],
 ]
 
@@ -92,7 +109,8 @@ export default function Landing({ onEnter, theme, setTheme }) {
           <h1>A second pair of eyes for your startup idea and your code.</h1>
           <p className="l-lead">
             It checks an idea against real research papers and builds a small working prototype.
-            It reads a Python project and finds the lines behind a bug.
+            It reads a Python project, finds the lines behind a bug, and finds where the code
+            would fail, with research papers on each kind of failure.
             Code checks every answer before you see it.
           </p>
           <div className="row" style={{ gap: 12 }}>
@@ -117,8 +135,8 @@ export default function Landing({ onEnter, theme, setTheme }) {
               fixed-size text blocks that break functions apart, or rewrite code without showing why.
             </p>
             <p className="l-gap-text strong">
-              This project grounds every answer in the real structure of the code and in live sources,
-              explains it, checks it in code, and never edits your files.
+              This project grounds every answer in the real structure of the code and in live research
+              papers, explains it, checks it in code, and never edits your files.
             </p>
           </div>
         </div>
@@ -126,7 +144,7 @@ export default function Landing({ onEnter, theme, setTheme }) {
 
       <section id="tools" className="l-section">
         <div className="l-wrap">
-          <h2 className="l-h2">Two tools</h2>
+          <h2 className="l-h2">Three tools</h2>
           <div className="l-tools">
             {TOOLS.map((t) => (
               <article key={t.id} className="l-tool">
@@ -155,6 +173,10 @@ export default function Landing({ onEnter, theme, setTheme }) {
             <figcaption>Codebase Evaluation</figcaption>
             <PipelineGraph pipeline={CODE_PIPELINE} events={[]} phase="idle" />
           </figure>
+          <figure className="l-figure">
+            <figcaption>Failure Simulator</figcaption>
+            <PipelineGraph pipeline={FAILURE_PIPELINE} events={[]} phase="idle" />
+          </figure>
         </div>
       </section>
 
@@ -175,7 +197,7 @@ export default function Landing({ onEnter, theme, setTheme }) {
                 {PAPERS.map(([who, title, id, use]) => (
                   <tr key={id}>
                     <td>
-                      <a href={`https://arxiv.org/abs/${id}`} target="_blank" rel="noopener noreferrer">{title}</a>
+                      <a href={id.startsWith('http') ? id : `https://arxiv.org/abs/${id}`} target="_blank" rel="noopener noreferrer">{title}</a>
                       <div className="tiny muted">{who}</div>
                     </td>
                     <td>{use}</td>
@@ -208,6 +230,7 @@ export default function Landing({ onEnter, theme, setTheme }) {
           <div className="row" style={{ gap: 12 }}>
             <button className="btn primary l-big" onClick={() => onEnter('startup')}>Check an idea</button>
             <button className="btn l-big" onClick={() => onEnter('code')}>Evaluate a codebase</button>
+            <button className="btn l-big" onClick={() => onEnter('failure')}>Find failure points</button>
           </div>
         </div>
       </section>

@@ -12,8 +12,9 @@ Guide for Claude (and other coding agents) working on this repo. Read it fully b
 |---|---|---|
 | **Startup Assistance** | `idea_validation` | Checks an idea against the web, **real research papers**, and a devil's advocate; scores it with a fixed rubric; writes a PRD, diagrams and a roadmap. The **Prototype Builder** (Prototype tab) then codes a tiny FastAPI + HTML app from the PRD, tests it, runs it and monitors it. |
 | **Codebase Evaluation** | `codebase_analysis` | Reads a Python repo (local path or GitHub URL), finds the code behind a bug or question, shows what a change would break, and has a critic verify every answer against the real files. Read-only. |
+| **Failure Simulator** | `failure_analysis` (only via `force_intent`) | Finds failure points in a Python repo with 11 fixed checks (each a CWE type), shows which entry points each failure reaches (call graph) with a short scenario, links each kind of failure to **live research papers**, and suggests fixes that a code critic checks. Read-only. |
 
-The user's goal: **impress teachers in a viva**. That only works if everything shown is real and checkable, so honesty is a hard rule (section 2).
+The user's goal: **impress teachers in a viva**. The teachers care mostly about research, so **from Nov 2026 the direction is "less tech, more research"**: keep features modest, and make every feature show its research basis (papers found live, CWE, the literature table on the landing page). That only works if everything shown is real and checkable, so honesty is a hard rule (section 2).
 
 ---
 
@@ -91,6 +92,21 @@ PRD (session) → Spec Planner (top 3 requirements, code) → Code Writer (1 AI 
 - Budget: `prototype` 4800 max tokens (reasoning tokens count too), `prototype_fix` 4000; both fit one model's 8k/minute. Calls use `min_answer_tokens` (never shrunk below 4000/3000: a shrunk code answer is cut off; it waits up to 65 s for a window instead), `use_cache=False` (Build again = new code) and `timeout=90`. Cut-off answers (`finish_reason == "length"`) are never cached anywhere.
 - A file missing or cut off in the answer goes to the Code Fixer (asked for just that file), not straight to the fallback. `runtime_check()` fails the build with a clear pip message if fastapi/uvicorn/pytest/httpx cannot be imported in the sandbox env (site-packages dirs are passed via PYTHONPATH so `pip install --user` setups work).
 
+### Failure Simulator (`agents/failure_agent.py` + `tools/failure_checks.py`)
+```
+(clone if GitHub URL) → AST index → Failure Scanner (11 AST checks, CWE each, test files skipped, secrets masked)
+  → Failure Spread (ChangeImpactAgent callers + entry points; scenario text from a per-type template, no AI)
+  → Failure Research (top 5 failure types: 2 queries each on arXiv/S2/OpenAlex; keep a paper only if it names the
+    failure (`must` word patterns); rank by MiniLM/TF-IDF similarity to the type's topic; key sentence = abstract
+    sentence with most topic words)
+  → Fix Advisor (1 AI call, `failure_fix` 2.6k tokens, one failure point per type, max 5; papers given as [R1..R3])
+  → Fix Critic (fix parses, the same check no longer fires on it, [R] citations must be retrieved papers, abstract
+    support ratio; a research note without a valid citation is dropped)
+```
+- Readiness = 100 - 8 per high, 4 per medium, 1 per low, each kind counted at most twice (computed in code). The demo repo `sample_startup_repo/` (CampusEats, made up) has 12 planted failure points of 9 kinds and scores 31.
+- No AI: standard fix per type + "closest paper" note from the abstract, labelled fallback. `failure_simulator.research_enabled` overrides `PRIOR_ART_ENABLED` (tests).
+- Started from the Prototype tab too ("Check for failure points", `copilot:failure` event). Route `#/app/failure`.
+
 ### API (FastAPI, `app.py`)
 | Endpoint | Purpose |
 |---|---|
@@ -108,6 +124,7 @@ PRD (session) → Spec Planner (top 3 requirements, code) → Code Writer (1 AI 
 - **Idea:** `project_title`, `problem_statement`, `core_value_prop`, `target_personas`, `mvp_features`, `competitors[]`, `tech_stack{layer: {choice, rationale, tradeoffs}}`, `citations[] (is_live)`, `scorecard{total_score, verdict, verdict_summary, categories[], evidence_confidence, ...}`, `kill_report{fatal_flaws[], bear_case_summary, ...}`, `reconciliation{verdict, must_have_mitigations, key_tradeoffs}`, `prd{product_vision, user_stories, functional_requirements, *_diagram_mermaid}`, `phases[]`, `risks[]`, **`prior_art`** (below), `provenance{section: llm|fallback|deterministic}`, `sections_13` (14 entries when prior art ran), `full_report_markdown`.
 - **`prior_art`:** `papers[]{ref_id, title, authors, year, venue, abstract, url, pdf_url, doi, source, also_found_in, citation_count, similarity}`, `novelty_index`, `novelty_band`, `closest_similarity`, `evidence_confidence`, `similarity_backend`, `search_backend`, `queries`, `comparisons[]{ref, what_it_does, overlap, paper_is_stronger_at, idea_adds, overlap_level, abstract_support}`, `research_gap`, `positioning`, `related_work`, `ieee_references[]`, `bibtex`, `similarity_map[]{label, x, y, is_idea, similarity}`, `verification{comparisons_kept, invalid_refs_dropped, citations_removed, avg_abstract_support}`, `notes[]`, `generation_source`.
 - **Prototype build:** `id`, `title`, `path`, `generation_source`, `fallback_reason`, `repaired`, `build_mode (design|full)`, `app_kind`, `spec{requirements[]}`, `files[]{path, lines, written_by: generated|ai|fallback|template, content}`, `checks{safety_ok, compile_ok, tests{ok, passed, failed, errors, total, output, duration_ms}, server{ok, url, port, ms, error}, endpoints[]{method, path, status|null, ms}}`. Monitor status: `state (running|crashed|stopped)`, `url`, `uptime_s`, `auto_stop_in_s`, `requests_visitors`, `requests_checks`, `server_errors`, `client_errors`, `avg_ms`, `recent[]`, `recent_errors[]`, `server_log[]`.
+- **Failure:** `type: failure_analysis`, `summary`, `readiness{score, band, formula, penalties[]}`, `counts{high, medium, low, total, files_scanned}`, `failure_types[]{type, title, cwe, cwe_name, cwe_url, severity, why, fix, count}`, `findings[]{id, type, title, severity, cwe, file_path, line, symbol, code_line, context_start, context_code, callers[], entrypoints[], scenario}`, `research[]{type, title, queries, papers[]{ref, title, authors, year, venue, url, pdf_url, doi, source, similarity, abstract, key_sentence, ieee}, dropped}`, `fixes[]{id, what_can_go_wrong, fixed_code, fix_hint, research_note, cited_refs, generated_by, checks{compiles, failure_gone, citations_valid, abstract_support}}`, `verification`, `notes`, `generation_source`, `provenance`.
 - **Code:** `summary`, `question_mode`, `candidates[]{rank, file_path, symbol_name, line_start, line_end, confidence, why_problematic, wrong_code, recommended_pattern, explanation_of_change, generated_by, verification{file_exists, symbol_exists, lines_in_bounds, in_retrieved_evidence, quote_matches_disk, fix_compiles}}`, `critic{grounding_score, is_valid, total_checked, total_verified, code_quote_matches, fixes_compiling, fixes_checked, flags}`, `impact{target_symbol, risk_level, blast_radius_score, direct_callers[], indirect_callers[], affected_tests, affected_entrypoints, mermaid_diagram, recommendations}`, `flow{hops[]}`, `retrieved_locations[]`, `indexed_summary`, `retrieval_backend`, `local_repo_path`.
 
 ---
@@ -126,6 +143,7 @@ PRD (session) → Spec Planner (top 3 requirements, code) → Code Writer (1 AI 
 - `agents/idea_agent.py`, `market_agent.py`, `kill_agent.py` (+ reconciler), `prd_agent.py`, `roadmap_agent.py`: idea track. Every result has `generation_source` + `fallback_reason`.
 - `agents/conversation_session.py`: follow-up engine, `SessionManager` (LRU + TTL + SQLite).
 - `agents/prototype_agent.py` (builder + prompts), `agents/prototype_templates.py` (main.py, base.css, fallback app), `tools/prototype_sandbox.py` (safety check, compile, pytest, process manager, monitor, zip).
+- `agents/failure_agent.py` (Failure Simulator pipeline), `tools/failure_checks.py` (checks, CWE catalogue with research queries, readiness, fix check), `sample_startup_repo/` (demo repo with planted failure points; do not "fix" it).
 - `indexer/`: `ast_parser.py`, `bm25_search.py`, `vector_search.py` (MiniLM once per process), `hybrid_retriever.py`, `index_cache.py`, `github_ingest.py`.
 - `tools/search_tool.py`: Tavily → `ddgs` → DDG Instant Answer → labelled offline references.
 
@@ -136,6 +154,7 @@ PRD (session) → Spec Planner (top 3 requirements, code) → Code Writer (1 AI 
 - `pipelines.js`: graph definitions matched to trace `agent_name`s; `nodeStates()` derives done / working / fallback from real events and the dependency graph.
 - `components/`: `PipelineGraph` (SVG agent graph), `RunPanel` (live graph + step log + AI calls), `TraceView` ("How it ran" tab), `FollowUp`, `ui.jsx` (Tag, Source, Bar, Score, More, Markdown via marked + DOMPurify, Mermaid lazy-loaded with `securityLevel: 'strict'`, `modelName`, `plainText`).
 - `startup/StartupResult.jsx` (tabs: Overview, Research papers, Scorecard, Market, Risks, Plan, Prototype, How it ran), `startup/Prototype.jsx` (live build graph, stats, live preview iframe, monitor polled every 2 s, checks, code viewer, zip, "Review with Codebase Evaluation" via a `copilot:review` window event), `startup/Papers.jsx` (spotlight, novelty, similarity map, paper list, comparisons, gap/positioning, Related Work, BibTeX).
+- `failure/FailureResult.jsx` (tabs: Overview with readiness and CWE table, Failure points with "If it fails" and callers, Research with papers per failure type, Fixes with checks and before/after, How it ran). `FailurePage` lives in `App.jsx`.
 - `code/CodeResult.jsx` (tabs: Overview, Findings with verification checks and before/after code, Impact, How it ran).
 - `styles.css`: design tokens (light default, dark via `data-theme`), flat components. Palette: grey background, blue accent (changed from beige/orange so it reads less like an AI product).
 - Legacy UI: `web/templates/index.html` (kept at `/legacy`, not developed further).
@@ -214,6 +233,13 @@ Grounded prompts, deterministic critic with quote-vs-disk and compile checks, ho
 - Tests: 129 pass (`tests/test_prototype.py`: design path, AI-down keyword path, the 3 demo ideas + a tracker run their own generated tests, messy designs cleaned or rejected).
 - **Not yet checked with a real key:** run the 3 demo ideas on the laptop and look at the AI's design (names, sample data).
 
+### Phase 9: Failure Simulator + research focus (same branch)
+- New third tool (see section 4). Header: Startup Assistance · Codebase Evaluation · Failure Simulator. Prototype stays a tab inside Startup Assistance (it needs the idea run); it has a "Check for failure points" button.
+- Landing page: three tools, the Failure Simulator graph, two facts rows, a comparison row, and two verified sources in "Built on this research": Yuan et al., OSDI 2014 ("Simple Testing Can Prevent Most Critical Failures", USENIX link opened and checked) and MITRE CWE.
+- Checked in Chromium on the demo repo without a key: 12 failure points, 15 live arXiv papers on 5 failure types, standard fixes labelled fallback; no sideways scroll at 390px.
+- Tests: 135 pass (`tests/test_failure.py`: each check fires and its safe version does not, readiness cap, fix check, demo repo end to end with stubbed search, AI fixes checked by the critic, SSE endpoint).
+- **Not yet checked with a real key:** the Fix Advisor's AI fixes and research notes. Run the demo repo on the laptop.
+
 ### Measured numbers (real runs, keep updated)
 - Live idea run (Oct 2026, cloud, real key): 7 calls, ~16k tokens, 13 s, no fallbacks; every answer `finish_reason=stop` and used about half its max_tokens. Devil's advocate, Judge and PRD went to gpt-oss-20b because gpt-oss-120b's 8k/minute was used by the parallel steps (by design).
 - Code runs on `sample_repo`: 1 call, ~2.5k tokens, 3-13 s.
@@ -227,7 +253,7 @@ Grounded prompts, deterministic critic with quote-vs-disk and compile checks, ho
 
 ## 8. What is left and what needs improvement (start here next session)
 
-**Next feature (agreed with the user, Nov 2026): Failure Simulator, a new top-level tool.** Keep it modest and research-led ("focus less on tech, more on research"): scan a repo (or the prototype just built) with fixed checks for failure points, then for each one show the weakness type (CWE), real papers about that kind of failure from the existing paper search, and a suggested fix. No live fault injection or heavy tooling. Planned top bar: Idea Check · Prototype · Code Review · Failure Simulator.
+**Direction (user, Nov 2026): less tech, more research.** Do not add heavy tooling (live fault injection, sandboxes, new infra). Prefer features that show research: papers, CWE, citations checked against abstracts. Gemini as a backup model provider was discussed and postponed by the user ("we will take on gemini later").
 
 **Must fix / verify next (in this order)**
 - **Live check of all three demo ideas** (one prototype checked live in Phase 5): run the three demo ideas, then build a prototype for each. Check the generated page looks right, tests pass, the Code Fixer works when needed, and the monitor counts clicks in the preview. Record pass rate, tokens and build time under "Measured numbers" (real numbers only).
