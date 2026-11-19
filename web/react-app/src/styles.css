@@ -452,3 +452,7 @@ details.more[open] > summary::before { content: '- '; }
 .picked { box-shadow: inset 3px 0 0 var(--accent); background: var(--accent-soft); }
 .card.picked { border-color: var(--accent); background: var(--surface); box-shadow: inset 3px 0 0 var(--accent); }
 .focus-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; border: 1px solid var(--accent); border-radius: var(--radius-sm); background: var(--accent-soft); font-size: 13.5px; }
+.fail-rows { display: grid; }
+.fail-row { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) 76px; gap: 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.fail-row:last-child { border-bottom: 0; }
+@media (max-width: 640px) { .fail-row { grid-template-columns: minmax(0, 1fr); gap: 6px; } }

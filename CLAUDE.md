@@ -43,7 +43,7 @@ The user's goal: **impress teachers in a viva**. The teachers care mostly about 
 ```bash
 pip install -r requirements.txt
 python app.py                                   # http://127.0.0.1:8000  (new UI at /, old UI at /legacy)
-GROQ_API_KEY= pytest -q                         # 129 pass, 3 live smoke tests skip without a key
+GROQ_API_KEY= pytest -q                         # 138 pass, 3 live smoke tests skip without a key
 python evaluation/compare_baseline.py           # naive vs AST chunking (computed)
 python evaluation/retrieval_benchmark.py        # BM25 / vector / hybrid Top-1, Top-3, MRR
 python evaluation/free_tier_budget.py           # token plan vs the model limits (no quota used)
@@ -248,6 +248,14 @@ Grounded prompts, deterministic critic with quote-vs-disk and compile checks, ho
 
 ### Phase 11: header (same branch)
 - Header redone: no "AC" logo mark (also removed from the landing nav; the favicon still uses it), the three tools as text tabs, engine status moved to a toast. Phones: tabs share the width on their own row; the repo field wraps (`.repo-row`). Checked light, dark and 390px.
+
+### Phase 12: Boost Your Startup wording + "Why startups fail" data (same branch)
+- Product name in the UI is now **Boost Your Startup** (descriptor: Agentic AI Co-Pilot). The project sheet keeps the report's official title. Landing copy follows the startup journey (idea, prototype, code, launch).
+- `data/startup_failure_reasons.json`: CB Insights, "The top 9 reasons startups fail" (published 2026-03-05, data as of 2026-02-06, 385 of 431 VC-backed shutdowns since 2023 with known reasons; shares overlap). The 9 shares were read from the report's chart image (checked visually), 4 of them are also in its text. Each reason says honestly whether this project checks it (covered / partly / none; operations and leadership is "none", cash runway is only "partly").
+- `tools/startup_failure_data.py`: `load()`, `check_text()`, `verify_live()` (fetches the report page, re-checks the 4 text figures and the sample size; cached 6 h). `GET /api/startup-failure-data?verify=1`. Live check on 2026-11-19: 4/4 match.
+- UI: `components/WhyStartupsFail.jsx` (bar chart coloured by coverage, click a bar for how the project answers it, "Check against the source now"). Shown on the landing page (`#why-fail`), as a "Why startups fail" tab in Startup Assistance results (adds "Your idea against these reasons" from the scorecard, judge and papers), and as a one-paragraph note on the Failure Simulator page.
+- If CB Insights publishes a new edition, update the JSON from the new report and keep the source fields true. Do not store the chart image (copyright); only the figures with the link.
+- Tests: 138 pass (`tests/test_startup_failure_data.py`).
 
 ### Measured numbers (real runs, keep updated)
 - Live idea run (Oct 2026, cloud, real key): 7 calls, ~16k tokens, 13 s, no fallbacks; every answer `finish_reason=stop` and used about half its max_tokens. Devil's advocate, Judge and PRD went to gpt-oss-20b because gpt-oss-120b's 8k/minute was used by the parallel steps (by design).

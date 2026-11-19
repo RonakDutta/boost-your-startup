@@ -1,4 +1,5 @@
 import PipelineGraph from './components/PipelineGraph.jsx'
+import WhyStartupsFail from './components/WhyStartupsFail.jsx'
 import { CODE_PIPELINE, FAILURE_PIPELINE, STARTUP_PIPELINE } from './pipelines.js'
 
 // From the project report (cover page).
@@ -91,6 +92,7 @@ export default function Landing({ onEnter, theme, setTheme }) {
             <span>Boost Your Startup</span>
           </button>
           <div className="l-links">
+            <a href="#why-fail">Why startups fail</a>
             <a href="#tools">Tools</a>
             <a href="#how">How it works</a>
             <a href="#compare">Compared to a chatbot</a>
@@ -139,6 +141,16 @@ export default function Landing({ onEnter, theme, setTheme }) {
               are never edited.
             </p>
           </div>
+        </div>
+      </section>
+
+      <section id="why-fail" className="l-section">
+        <div className="l-wrap stack-lg">
+          <div>
+            <h2 className="l-h2">Why startups fail</h2>
+            <p className="l-note">Published data on 385 startups that shut down since 2023. Most failures start with the idea and the market, which is why the first tool checks the idea before any code is written.</p>
+          </div>
+          <WhyStartupsFail />
         </div>
       </section>
 

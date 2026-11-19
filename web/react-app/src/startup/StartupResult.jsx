@@ -6,6 +6,7 @@ import TraceView from '../components/TraceView.jsx'
 import FollowUp from '../components/FollowUp.jsx'
 import { Bar, Mermaid, More, SafeLink, Score, Source, Tabs, Tag, downloadText, toneFor } from '../components/ui.jsx'
 import { Timeline } from '../components/charts.jsx'
+import WhyStartupsFail from '../components/WhyStartupsFail.jsx'
 
 const SEV_TONE = { Critical: 'risk', High: 'risk', Medium: 'warn', Low: '' }
 const SECTION_NAMES = {
@@ -302,6 +303,7 @@ export default function StartupResult({ run }) {
   const tabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'papers', label: 'Research papers', count: pa?.papers?.length ?? 0 },
+    { id: 'fail', label: 'Why startups fail' },
     { id: 'score', label: 'Scorecard' },
     { id: 'market', label: 'Market' },
     { id: 'risks', label: 'Risks' },
@@ -321,6 +323,7 @@ export default function StartupResult({ run }) {
       <Tabs tabs={tabs} value={tab} onChange={go} />
       {tab === 'overview' && <Overview out={out} goTo={go} />}
       {tab === 'papers' && <Papers pa={pa} title={out.project_title} />}
+      {tab === 'fail' && <WhyStartupsFail out={out} goTo={go} />}
       {tab === 'score' && <Scorecard sc={out.scorecard || {}} />}
       {tab === 'market' && <Market out={out} />}
       {tab === 'risks' && <Risks out={out} />}

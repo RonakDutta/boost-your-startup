@@ -291,6 +291,12 @@ function FailurePage() {
         </div>
       )}
       {!run && <Why items={FAILURE_WHY} />}
+      {!run && (
+        <div className="card pad small" style={{ color: 'var(--ink-2)' }}>
+          In CB Insights' 2026 study of 385 failed startups, 3% named technical issues and 3% fraud or legal problems as a reason.
+          This tool checks the code side of both. The bigger reasons, such as poor product-market fit (43%), are covered by Startup Assistance.
+        </div>
+      )}
       {run && <RunPanel run={run} pipeline={FAILURE_PIPELINE} />}
       {run?.phase === 'error' && <div className="card pad small" style={{ color: 'var(--risk)' }}>{run.error}</div>}
       {run?.result && <FailureResult run={run} />}

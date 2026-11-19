@@ -436,6 +436,17 @@ def inspect_repository(req: InspectRepoRequest):
         )
 
 
+@app.get("/api/startup-failure-data")
+def startup_failure_data(verify: bool = False):
+    """Why startups fail (CB Insights survey data with its source). verify=1 re-checks the live report page."""
+    from tools import startup_failure_data as failure_data
+
+    body = dict(failure_data.load())
+    if verify:
+        body["verification"] = failure_data.verify_live()
+    return JSONResponse(content=body)
+
+
 @app.get("/api/sample-repo-path")
 def get_sample_repo_path():
     """Returns the normalized absolute path to the built-in sample demo repository."""
