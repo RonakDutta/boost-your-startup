@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { SOURCE_LABEL } from '../pipelines.js'
@@ -52,11 +52,11 @@ export function More({ label = 'Show more', children, open }) {
   )
 }
 
-/** Scrolls an element into view when `when` becomes true (no animation). */
-export function useScrollTo(id, when) {
+/** Scrolls an element into view when `when` becomes true (no animation). Its top lands under the sticky bars. */
+export function useScrollTo(id, when, again) {
   useEffect(() => {
-    if (when) document.getElementById(id)?.scrollIntoView({ block: 'center' })
-  }, [id, when])
+    if (when) document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: 'instant' })
+  }, [id, when, again])
 }
 
 export function SafeLink({ href, children, ...rest }) {
@@ -120,9 +120,27 @@ export function Section({ eyebrow, title, right, children }) {
   )
 }
 
+/**
+ * Sub-tabs. They stick under the header; when you switch tabs after scrolling down,
+ * the page jumps back to the top of the new tab's content (not to the top of the page).
+ */
 export function Tabs({ tabs, value, onChange }) {
+  const bar = useRef(null)
+  const first = useRef(true)
+  useLayoutEffect(() => {
+    if (first.current) { first.current = false; return }
+    const el = bar.current
+    if (!el) return
+    const stick = parseFloat(getComputedStyle(el).top) || 0
+    // Where the bar would be if it were not sticky (measured before the browser paints).
+    el.style.position = 'static'
+    const at = el.getBoundingClientRect().top
+    el.style.position = ''
+    // Only when the bar is stuck, i.e. its real place has scrolled above the header line.
+    if (at < stick) window.scrollTo({ top: window.scrollY + at - stick, behavior: 'instant' })
+  }, [value])
   return (
-    <div className="tabs" role="tablist">
+    <div className="tabs" role="tablist" ref={bar}>
       {tabs.map((t) => (
         <button key={t.id} type="button" role="tab" aria-selected={value === t.id} className={value === t.id ? 'on' : ''} onClick={() => onChange(t.id)}>
           {t.label}{t.count !== undefined && <span className="count">{t.count}</span>}
@@ -160,4 +178,6 @@ export function plainText(text) {
     .replace(/Groq API/g, 'AI engine')
     .replace(/Groq/g, 'AI')
     .replace(/free[- ]tier/gi, 'shared')
+    .replace(/\(LLM unavailable\)/g, '(AI not available)')
+    .replace(/\bLLMs?\b/g, 'AI')
 }

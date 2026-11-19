@@ -6,7 +6,7 @@ import { CODE_PIPELINE, FAILURE_PIPELINE, STARTUP_PIPELINE } from './pipelines.j
 const PROJECT = [
   ['Project', 'Agentic AI Co-Pilot: a multi-agent RAG system for startup assistance and codebase analysis'],
   ['Course', 'Minor Project (ARP-455)'],
-  ['Student', 'Ronak Dutta, B.Tech IIoT, batch IIoT B-1'],
+  ['Students', 'Ronak Dutta and Vishal Dev, B.Tech IIoT, batch IIoT B-1'],
   ['Guide', 'Dr. Sanjay Kumar Singh, Assistant Professor'],
   ['Institute', 'USAR, GGSIPU East Delhi Campus'],
   ['Session', '2026-2027'],
@@ -248,7 +248,7 @@ export default function Landing({ onEnter, theme, setTheme }) {
       </section>
 
       <footer className="l-wrap l-foot">
-        <span>Boost Your Startup (Agentic AI Co-Pilot), by Ronak Dutta</span>
+        <span>Boost Your Startup (Agentic AI Co-Pilot), by Ronak Dutta and Vishal Dev</span>
         <span>Guide: Dr. Sanjay Kumar Singh, USAR, GGSIPU</span>
       </footer>
     </div>

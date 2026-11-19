@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Bar, More, SafeLink, Source, Tag, downloadText, useScrollTo } from '../components/ui.jsx'
+import { Bar, More, SafeLink, Source, Tag, downloadText, plainText, useScrollTo } from '../components/ui.jsx'
 import { Columns, HBars, SplitBar, yearColumns } from '../components/charts.jsx'
 
 const SOURCE_NAMES = { arxiv: 'arXiv', semantic_scholar: 'Semantic Scholar', openalex: 'OpenAlex' }
@@ -86,10 +86,16 @@ export function SimilarityMap({ points, papers }) {
   )
 }
 
+/** Fallback comparisons say "Not assessed (...)"; those lines are left out instead of shown. */
+function assessedText(t) {
+  return !!t && !/^not assessed/i.test(String(t).trim())
+}
+
 export function Spotlight({ pa }) {
   const p = (pa.papers || [])[0]
   if (!p) return null
   const cmp = (pa.comparisons || []).find((c) => c.ref === p.ref_id) || {}
+  const assessed = assessedText(cmp.paper_is_stronger_at) && assessedText(cmp.idea_adds)
   return (
     <div className="card pad-lg spotlight stack">
       <div className="row between">
@@ -104,15 +110,15 @@ export function Spotlight({ pa }) {
       </SafeLink>
       <div className="small muted">{authors(p.authors, 6)} · {p.venue || sourceName(p.source)} · {p.year || 'n.d.'}{p.citation_count != null ? ` · ${p.citation_count} citations` : ''}</div>
       {p.abstract && <p className="small clamp-3" style={{ margin: 0, color: 'var(--ink-2)' }}>{p.abstract}</p>}
-      {cmp.paper_is_stronger_at && (
+      {assessed && (
         <div className="grid g2">
           <div className="soft" style={{ padding: 12 }}>
             <div className="eyebrow" style={{ color: 'var(--warn)' }}>Where the paper is stronger</div>
-            <div className="small">{cmp.paper_is_stronger_at}</div>
+            <div className="small">{plainText(cmp.paper_is_stronger_at)}</div>
           </div>
           <div className="soft" style={{ padding: 12 }}>
             <div className="eyebrow" style={{ color: 'var(--good)' }}>What your idea adds</div>
-            <div className="small">{cmp.idea_adds}</div>
+            <div className="small">{plainText(cmp.idea_adds)}</div>
           </div>
         </div>
       )}
@@ -126,7 +132,7 @@ export function Spotlight({ pa }) {
 }
 
 function PaperList({ papers, picked }) {
-  useScrollTo(`paper-${picked?.ref}`, !!picked)
+  useScrollTo(`paper-${picked?.ref}`, !!picked, picked?.n)
   return (
     <div className="card pad">
       {papers.map((p) => (
@@ -134,6 +140,7 @@ function PaperList({ papers, picked }) {
           <span className="ref">{p.ref_id}</span>
           <div style={{ minWidth: 0 }}>
             <SafeLink href={p.url} className="paper-title">{p.title}</SafeLink>
+            {picked?.ref === p.ref_id && <span className="picked-tag">Selected in the chart</span>}
             <div className="tiny muted">{authors(p.authors)} · {p.year || 'n.d.'} · {[p.source, ...(p.also_found_in || [])].map(sourceName).join(', ')}</div>
             <PaperLinks p={p} />
             {p.abstract && (
@@ -184,12 +191,12 @@ function Comparisons({ pa }) {
               </SafeLink>
               <Tag tone={LEVEL_TONE[c.overlap_level]}>{c.overlap_level} overlap</Tag>
             </div>
-            <div className="small" style={{ color: 'var(--warn)' }}><strong>Stronger at:</strong> <span style={{ color: 'var(--ink-2)' }}>{c.paper_is_stronger_at}</span></div>
-            <div className="small" style={{ color: 'var(--good)' }}><strong>You add:</strong> <span style={{ color: 'var(--ink-2)' }}>{c.idea_adds}</span></div>
+            {assessedText(c.paper_is_stronger_at) && <div className="small" style={{ color: 'var(--warn)' }}><strong>Stronger at:</strong> <span style={{ color: 'var(--ink-2)' }}>{plainText(c.paper_is_stronger_at)}</span></div>}
+            {assessedText(c.idea_adds) && <div className="small" style={{ color: 'var(--good)' }}><strong>You add:</strong> <span style={{ color: 'var(--ink-2)' }}>{plainText(c.idea_adds)}</span></div>}
             <More label="What it does and the overlap">
               <div className="small stack" style={{ gap: 6 }}>
-                <div><strong>Does:</strong> {c.what_it_does}</div>
-                <div><strong>Overlap:</strong> {c.overlap}</div>
+                <div><strong>Does:</strong> {plainText(c.what_it_does)}</div>
+                <div><strong>Overlap:</strong> {plainText(c.overlap)}</div>
                 <div className="tiny muted">{Math.round(c.abstract_support * 100)}% of this summary's key words appear in the paper's abstract.</div>
               </div>
             </More>
@@ -201,6 +208,8 @@ function Comparisons({ pa }) {
 }
 
 export default function Papers({ pa, title }) {
+  // Hooks first: they must run on every render, before any early return.
+  const [picked, setPicked] = useState(null)
   if (!pa) return <div className="empty">The research paper check was switched off for this run.</div>
   const papers = pa.papers || []
   if (!papers.length) {
@@ -212,7 +221,6 @@ export default function Papers({ pa, title }) {
       </div>
     )
   }
-  const [picked, setPicked] = useState(null)
   const slug = (title || 'idea').toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 40)
   return (
     <div className="stack-lg">

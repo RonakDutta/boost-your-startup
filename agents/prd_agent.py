@@ -297,7 +297,8 @@ class PRDAgent:
         if len(functional_reqs) < 2:
             existing_titles = {f.title.lower() for f in functional_reqs}
             for idx, feat in enumerate(decomposed.mvp_features, start=len(functional_reqs) + 1):
-                title = feat[:30]
+                # Shorten at a word boundary so titles never end mid-word.
+                title = feat if len(feat) <= 60 else feat[:60].rsplit(" ", 1)[0]
                 if title.lower() not in existing_titles:
                     functional_reqs.append(
                         FunctionalRequirement(
