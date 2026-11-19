@@ -386,3 +386,42 @@ details.more[open] > summary::before { content: '- '; }
 .l-end .l-h2 { margin: 0; }
 .l-foot { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-top: 18px; padding-bottom: 28px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
 .brand-name.link { cursor: pointer; border: 0; background: none; padding: 0; text-align: left; font-size: inherit; }
+
+/* ---------- charts (components/charts.jsx): flat, thin marks, theme colours ---------- */
+.chart { position: relative; }
+.chart-tip { position: absolute; transform: translate(-50%, calc(-100% - 10px)); background: var(--ink); color: var(--surface); font-size: 12px; padding: 5px 8px; border-radius: 4px; pointer-events: none; white-space: nowrap; z-index: 5; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+.hbars { display: grid; column-gap: 14px; row-gap: 10px; align-items: center; }
+.hbar-label { display: flex; flex-direction: column; min-width: 0; font-size: 13.5px; line-height: 1.3; }
+.hbar-label > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hbar-row.pick .hbar-label, .hbar-row.pick .hbar-track { cursor: pointer; }
+.hbar-track { display: flex; align-items: center; gap: 8px; min-width: 0; outline: none; }
+.hbar-track i { display: block; height: 14px; border-radius: 0 4px 4px 0; flex: none; max-width: calc(100% - 44px); }
+.hbar-stack { display: flex; gap: 2px; height: 14px; flex: none; max-width: calc(100% - 60px); }
+.hbar-stack i { display: block; height: 100%; min-width: 3px; }
+.hbar-stack i:last-child { border-radius: 0 4px 4px 0; }
+.hbar-track b { font-size: 12.5px; font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.split-bar { display: flex; gap: 2px; height: 14px; }
+.split-bar i { display: block; height: 100%; min-width: 3px; outline: none; }
+.split-bar i:first-child { border-radius: 4px 0 0 4px; }
+.split-bar i:last-child { border-radius: 0 4px 4px 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: 12.5px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.legend b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.cols-chart { display: flex; align-items: flex-end; gap: 6px; border-bottom: 1px solid var(--line-strong); }
+.cols-chart .col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; outline: none; min-width: 0; }
+.cols-chart .col i { display: block; width: min(24px, 100%); border-radius: 4px 4px 0 0; }
+.cols-chart .cap { font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 3px; }
+.cols-axis { display: flex; gap: 6px; margin-top: 5px; }
+.cols-axis span { flex: 1; text-align: center; font-size: 11.5px; color: var(--muted); min-width: 0; overflow: hidden; }
+.timeline { display: grid; row-gap: 10px; }
+.tl-row { display: grid; grid-template-columns: minmax(0, 210px) minmax(0, 1fr); column-gap: 14px; align-items: center; }
+.tl-track { position: relative; height: 14px; background: var(--surface-2); border-radius: 4px; }
+.tl-track i { position: absolute; top: 0; height: 100%; border-radius: 4px; outline: none; }
+.tl-axis { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 4px; }
+.flow-wrap { overflow-x: auto; }
+.flow-title { font-size: 12px; font-weight: 600; fill: var(--muted); font-family: var(--font); }
+.flow-label { font-size: 13px; font-weight: 600; fill: var(--ink); font-family: var(--font); }
+.flow-sub { font-size: 11px; fill: var(--muted); font-family: var(--mono); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 640px) { .hbars { grid-template-columns: minmax(0, 110px) minmax(0, 1fr) !important; } .tl-row { grid-template-columns: minmax(0, 110px) minmax(0, 1fr); } }

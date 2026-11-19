@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import TraceView from '../components/TraceView.jsx'
 import { Bar, More, SafeLink, Score, Source, Tabs, Tag, plainText } from '../components/ui.jsx'
+import { Columns, FlowGraph, HBars, SplitBar } from '../components/charts.jsx'
 
 const SEV_TONE = { high: 'risk', medium: 'warn', low: '' }
+const SEV_CHART = { high: 'risk', medium: 'warn', low: 'low' }
+const SEV_RANK = { high: 0, medium: 1, low: 2 }
 const SOURCE_NAMES = { arxiv: 'arXiv', semantic_scholar: 'Semantic Scholar', openalex: 'OpenAlex' }
 const cweUrl = (cwe) => `https://cwe.mitre.org/data/definitions/${String(cwe).split('-')[1]}.html`
 
@@ -32,13 +35,57 @@ function Where({ f }) {
   return <span className="mono tiny muted">{f.file_path}:{f.line}{f.symbol ? ` · ${f.symbol}()` : ''}</span>
 }
 
+/** Entry points -> functions that hold failure points -> kinds of failure. */
+function SpreadGraph({ out, goTo }) {
+  const findings = out.findings || []
+  const entries = new Map(), funcs = new Map(), kinds = new Map(), edges = new Set()
+  for (const f of findings) {
+    const fid = `f:${f.file_path}:${f.symbol}`
+    const worst = funcs.get(fid)?.sev
+    if (!funcs.has(fid) || SEV_RANK[f.severity] < SEV_RANK[worst]) {
+      funcs.set(fid, { id: fid, label: f.symbol ? `${f.symbol}()` : f.file_path, sub: f.symbol ? f.file_path : 'module settings', tone: SEV_CHART[f.severity], sev: f.severity })
+    }
+    kinds.set(`k:${f.type}`, { id: `k:${f.type}`, label: f.title, sub: f.cwe, tone: SEV_CHART[f.severity] })
+    edges.add(`${fid}|k:${f.type}`)
+    for (const e of f.entrypoints || []) {
+      const [file, name] = e.includes(':') ? e.split(':') : ['', e]
+      if (name === f.symbol) continue
+      entries.set(`e:${e}`, { id: `e:${e}`, label: `${name}()`, sub: file, tone: 'accent' })
+      edges.add(`e:${e}|${fid}`)
+    }
+  }
+  const columns = [
+    { title: 'Entry points (what users call)', nodes: [...entries.values()] },
+    { title: 'Code with a failure point', nodes: [...funcs.values()].sort((x, y) => SEV_RANK[x.sev] - SEV_RANK[y.sev]) },
+    { title: 'Kind of failure', nodes: [...kinds.values()] },
+  ].filter((c) => c.nodes.length)
+  if (!findings.length) return null
+  return (
+    <div className="card pad stack">
+      <div className="row between"><h3>How a failure spreads</h3><span className="tiny muted">From the call graph, no AI. Hover a box to follow its path.</span></div>
+      <FlowGraph columns={columns} edges={[...edges].map((e) => e.split('|'))} onPick={() => goTo('points')} />
+    </div>
+  )
+}
+
 function Overview({ out, goTo }) {
   const r = out.readiness || {}
   const c = out.counts || {}
   const v = out.verification || {}
-  const top = (out.findings || [])[0]
-  const papers = (out.research || []).reduce((n, g) => n + g.papers.length, 0)
+  const groups = out.research || []
+  const papers = groups.reduce((n, g) => n + g.papers.length, 0)
   const tone = r.score >= 85 ? 'good' : r.score >= 60 ? 'warn' : 'risk'
+  const lost = (sev) => (r.penalties || []).filter((p) => p.severity === sev).reduce((n, p) => n + p.points, 0)
+  const byFile = {}
+  for (const f of out.findings || []) {
+    const row = byFile[f.file_path] || (byFile[f.file_path] = { high: 0, medium: 0, low: 0 })
+    row[f.severity] += 1
+  }
+  const fileRows = Object.entries(byFile)
+    .map(([file, n]) => ({ key: file, label: file, value: n.high + n.medium + n.low,
+      parts: [{ value: n.high, tone: 'risk' }, { value: n.medium, tone: 'warn' }, { value: n.low, tone: 'low' }],
+      tip: `${file}: ${n.high} high, ${n.medium} medium, ${n.low} low` }))
+    .sort((x, y) => y.value - x.value)
   return (
     <div className="stack-lg">
       <div className="card pad-lg verdict">
@@ -48,55 +95,50 @@ function Overview({ out, goTo }) {
           <div className={`state ${tone}`}>{r.band}</div>
         </div>
         <div className="stack">
-          <p style={{ margin: 0, fontSize: 18, lineHeight: 1.5 }}>{out.summary}</p>
-          <div className="row tiny">
-            <Tag tone="risk">{c.high || 0} high</Tag>
-            <Tag tone="warn">{c.medium || 0} medium</Tag>
-            <Tag>{c.low || 0} low</Tag>
-            <Tag tone="good">Read-only, nothing edited</Tag>
-          </div>
+          <div className="eyebrow">Where the 100 points went</div>
+          <SplitBar unit=" pts" total={100} parts={[
+            { label: 'Score left', value: r.score ?? 0, tone: 'good' },
+            { label: `High (${c.high || 0} found)`, value: lost('high'), tone: 'risk' },
+            { label: `Medium (${c.medium || 0})`, value: lost('medium'), tone: 'warn' },
+            { label: `Low (${c.low || 0})`, value: lost('low'), tone: 'low' },
+          ]} />
           <More label="How is this computed?">
             <p className="small muted" style={{ marginTop: 0 }}>{r.formula} Computed in code, no AI.</p>
-            <table className="tbl">
-              <tbody>
-                {(r.penalties || []).map((p) => (
-                  <tr key={p.type}><td>{p.title}</td><td><Tag tone={SEV_TONE[p.severity]}>{p.severity}</Tag></td><td className="mono tiny">x{p.count}</td><td className="mono tiny">-{p.points}</td></tr>
-                ))}
-              </tbody>
-            </table>
           </More>
         </div>
       </div>
 
-      <div className="grid g3">
-        <button type="button" className="card pad stack" style={{ textAlign: 'left', cursor: 'pointer', gap: 6 }} onClick={() => goTo('points')}>
-          <div className="eyebrow" style={{ color: 'var(--risk)' }}>Most serious</div>
-          {top ? (
-            <>
-              <div style={{ fontWeight: 600 }}>{top.title}</div>
-              <Where f={top} />
-              <div className="small muted clamp-3">{top.scenario}</div>
-            </>
-          ) : <div className="small muted">No failure points found.</div>}
-        </button>
-        <button type="button" className="card pad stack" style={{ textAlign: 'left', cursor: 'pointer', gap: 6 }} onClick={() => goTo('research')}>
-          <div className="eyebrow accent">Research papers</div>
-          <div className="row" style={{ alignItems: 'baseline', gap: 6 }}><span className="display" style={{ fontSize: 40, lineHeight: 1 }}>{papers}</span><span className="muted small">papers</span></div>
-          <div className="small muted">on {(out.research || []).filter((g) => g.papers.length).length} kinds of failure, from {out.research_backend}</div>
-        </button>
-        <button type="button" className="card pad stack" style={{ textAlign: 'left', cursor: 'pointer', gap: 6 }} onClick={() => goTo('fixes')}>
-          <div className="eyebrow">Fixes checked in code</div>
-          {v.fixes_checked ? (
-            <>
-              <div className="row" style={{ alignItems: 'baseline', gap: 6 }}><span className="display" style={{ fontSize: 40, lineHeight: 1 }}>{v.failures_removed}</span><span className="muted small">of {v.fixes_checked} remove the problem</span></div>
-              <div className="small muted">{v.fixes_compiling}/{v.fixes_checked} parse as Python</div>
-            </>
-          ) : <div className="small muted">Standard fixes shown ({(out.fixes || []).length}). AI fixes were not available.</div>}
-        </button>
+      <div className="grid g2">
+        <div className="card pad stack">
+          <h3>Failure points by kind</h3>
+          <HBars rows={(out.failure_types || []).map((t) => ({ key: t.type, label: t.title, sub: t.cwe, value: t.count, tone: SEV_CHART[t.severity],
+            tip: `${t.title} (${t.cwe}): ${t.count} found, ${t.severity}` }))} onPick={() => goTo('points')}
+            legend={[{ label: 'High', tone: 'risk' }, { label: 'Medium', tone: 'warn' }, { label: 'Low', tone: 'low' }]} />
+        </div>
+        <div className="card pad stack">
+          <div className="row between"><h3>Where they are</h3><span className="tiny muted">{c.files_scanned} files scanned</span></div>
+          <HBars rows={fileRows} labelWidth={170} legend={[{ label: 'High', tone: 'risk' }, { label: 'Medium', tone: 'warn' }, { label: 'Low', tone: 'low' }]} />
+        </div>
       </div>
 
-      <div className="card pad stack">
-        <div className="row between"><h3>Kinds of failure found</h3><span className="tiny muted">CWE = MITRE's public list of software weaknesses</span></div>
+      <SpreadGraph out={out} goTo={goTo} />
+
+      <div className="grid g3">
+        <button type="button" className="card stat" style={{ textAlign: 'left', cursor: 'pointer' }} onClick={() => goTo('research')}>
+          <div className="value">{papers}</div>
+          <div className="label">research papers on {groups.filter((g) => g.papers.length).length} kinds of failure</div>
+        </button>
+        <button type="button" className="card stat" style={{ textAlign: 'left', cursor: 'pointer' }} onClick={() => goTo('fixes')}>
+          <div className="value">{v.fixes_checked ? <>{v.failures_removed}<small>/ {v.fixes_checked}</small></> : (out.fixes || []).length}</div>
+          <div className="label">{v.fixes_checked ? 'AI fixes that remove the problem (checked in code)' : 'standard fixes (AI fixes not available)'}</div>
+        </button>
+        <div className="card stat">
+          <div className="value">{(out.checks_catalog || []).length}</div>
+          <div className="label">checks run, each a CWE weakness type</div>
+        </div>
+      </div>
+
+      <div className="card pad"><More label="Table view: every kind with its CWE entry">
         <div className="table-wrap">
           <table className="tbl">
             <thead><tr><th>Failure</th><th>Weakness</th><th>Level</th><th>Found</th></tr></thead>
@@ -112,10 +154,7 @@ function Overview({ out, goTo }) {
             </tbody>
           </table>
         </div>
-        <More label={`All ${(out.checks_catalog || []).length} checks that ran`}>
-          <div className="row tiny">{(out.checks_catalog || []).map((k) => <Tag key={k.type}>{k.title} · {k.cwe}</Tag>)}</div>
-        </More>
-      </div>
+      </More></div>
     </div>
   )
 }
@@ -169,11 +208,34 @@ function Points({ out }) {
 
 function Research({ out }) {
   const groups = out.research || []
+  const all = groups.flatMap((g) => g.papers.map((p) => ({ ...p, kind: g.title })))
+  const years = {}
+  for (const p of all) if (p.year) years[p.year] = (years[p.year] || 0) + 1
+  const span = Object.keys(years).map(Number).sort((a, b) => a - b)
+  const yearData = span.length ? Array.from({ length: span[span.length - 1] - span[0] + 1 }, (_, i) => span[0] + i)
+    .map((y) => ({ label: `'${String(y).slice(2)}`, value: years[y] || 0, tip: `${y}: ${years[y] || 0} paper(s)` })) : []
   return (
     <div className="stack-lg">
-      <div className="card pad small muted">
-        For each kind of failure, papers are searched live on arXiv, Semantic Scholar and OpenAlex. A paper is kept only if its title or abstract names that failure, then ranked by text similarity. The highlighted sentence is copied from the abstract.
-      </div>
+      {all.length > 0 && (
+        <div className="grid g2">
+          <div className="card pad stack">
+            <div className="row between"><h3>Results that named the failure</h3><span className="tiny muted">live from {out.research_backend}</span></div>
+            <HBars rows={groups.map((g) => {
+              const t = (out.failure_types || []).find((x) => x.type === g.type) || {}
+              const relevant = g.relevant ?? g.papers.length
+              return { key: g.type, label: g.title, sub: t.cwe, value: relevant + g.dropped,
+                parts: [{ value: g.papers.length, tone: 'accent' }, { value: relevant - g.papers.length, tone: 'info' }, { value: g.dropped, tone: 'var(--line-strong)' }],
+                display: `${relevant} of ${relevant + g.dropped}`,
+                tip: `${g.title}: ${relevant + g.dropped} results, ${relevant} named the failure, best ${g.papers.length} shown` }
+            })} legend={[{ label: 'Shown (best match)', tone: 'accent' }, { label: 'Also named the failure', tone: 'info' }, { label: 'Left out', tone: 'var(--line-strong)' }]} />
+          </div>
+          <div className="card pad stack">
+            <div className="row between"><h3>When they were published</h3><span className="tiny muted">{all.length} papers, {span[0]} to {span[span.length - 1]}</span></div>
+            <Columns data={yearData} height={130} />
+          </div>
+        </div>
+      )}
+      <div className="tiny muted">A paper is kept only if its title or abstract names the failure, then ranked by text similarity. The quoted line is copied from the abstract.</div>
       {groups.map((g) => {
         const t = (out.failure_types || []).find((x) => x.type === g.type) || {}
         return (
@@ -182,31 +244,31 @@ function Research({ out }) {
               <div className="row"><h3>{g.title}</h3><Cwe id={t.cwe} /><Tag tone={SEV_TONE[t.severity]}>{t.count} found</Tag></div>
               <span className="tiny muted">Searched: {g.queries.join(' · ')}</span>
             </div>
-            {g.papers.map((p) => (
+            {g.papers.map((p, i) => (
               <div key={p.ref} className="paper">
                 <span className="ref">{p.ref}</span>
                 <div className="stack" style={{ gap: 4 }}>
                   <SafeLink href={p.url}><span className="paper-title">{p.title}</span></SafeLink>
-                  <div className="tiny muted">{authors(p.authors)}{p.year ? ` · ${p.year}` : ''}{p.venue ? ` · ${p.venue}` : ''} · {SOURCE_NAMES[p.source] || p.source}{p.citation_count ? ` · ${p.citation_count} citations` : ''}</div>
-                  {p.key_sentence && <div className="small" style={{ borderLeft: '3px solid var(--line)', paddingLeft: 10 }}>{p.key_sentence}</div>}
-                  <div className="paper-links">
-                    <SafeLink href={p.url}>Open paper</SafeLink>
-                    {p.pdf_url && <SafeLink href={p.pdf_url}>PDF</SafeLink>}
-                    {p.doi && <SafeLink href={`https://doi.org/${p.doi}`}>DOI</SafeLink>}
-                  </div>
-                  <More label="Abstract and reference">
+                  <div className="tiny muted">{authors(p.authors)}{p.year ? ` · ${p.year}` : ''} · {SOURCE_NAMES[p.source] || p.source}{p.citation_count ? ` · ${p.citation_count} citations` : ''}</div>
+                  {i === 0 && p.key_sentence && <div className="small" style={{ borderLeft: '3px solid var(--accent)', paddingLeft: 10 }}>{p.key_sentence}</div>}
+                  <More label="Abstract, links and reference">
+                    {i > 0 && p.key_sentence && <p className="small" style={{ marginTop: 0, borderLeft: '3px solid var(--line)', paddingLeft: 10 }}>{p.key_sentence}</p>}
                     <p className="small" style={{ marginTop: 0 }}>{p.abstract || 'No abstract available.'}</p>
+                    <div className="paper-links" style={{ marginBottom: 6 }}>
+                      <SafeLink href={p.url}>Open paper</SafeLink>
+                      {p.pdf_url && <SafeLink href={p.pdf_url}>PDF</SafeLink>}
+                      {p.doi && <SafeLink href={`https://doi.org/${p.doi}`}>DOI</SafeLink>}
+                    </div>
                     <div className="mono tiny muted">{p.ieee}</div>
                   </More>
                 </div>
                 <div className="sim stack" style={{ gap: 4 }}>
                   <span className="tiny muted">Match {Math.round(p.similarity * 100)}%</span>
-                  <Bar value={p.similarity * 100} max={100} tone="good" />
+                  <Bar value={p.similarity * 100} max={Math.max(...g.papers.map((x) => x.similarity * 100), 1)} tone="good" />
                 </div>
               </div>
             ))}
             {!g.papers.length && <div className="small muted">No paper that names this failure was found. Nothing was invented in its place.</div>}
-            {g.dropped > 0 && <div className="tiny muted">{g.dropped} other search result{g.dropped > 1 ? 's' : ''} did not name this failure and {g.dropped > 1 ? 'were' : 'was'} left out.</div>}
           </div>
         )
       })}
@@ -264,10 +326,17 @@ function Fixes({ out }) {
   const v = out.verification || {}
   return (
     <div className="stack-lg">
-      <div className="row tiny">
-        <span className="muted">One fix per kind of failure, most serious first. Every AI fix is checked in code: it must parse, the same failure check must pass on it, and each citation must point to a paper that was retrieved.</span>
-        {v.citations_removed > 0 && <Tag tone="warn">{v.citations_removed} invalid citation(s) removed</Tag>}
-      </div>
+      {v.fixes_checked > 0 && (
+        <div className="card pad stack">
+          <div className="row between"><h3>Fix checks, run in code</h3>{v.citations_removed > 0 && <Tag tone="warn">{v.citations_removed} invalid citation(s) removed</Tag>}</div>
+          <HBars max={v.fixes_checked} rows={[
+            { label: 'Parses as Python', value: v.fixes_compiling, display: `${v.fixes_compiling}/${v.fixes_checked}`, tone: 'good' },
+            { label: 'Same check passes now', value: v.failures_removed, display: `${v.failures_removed}/${v.fixes_checked}`, tone: 'good' },
+            { label: 'Notes backed by a paper', value: v.notes_with_papers, display: `${v.notes_with_papers}/${(out.fixes || []).length}`, tone: 'accent' },
+          ]} />
+        </div>
+      )}
+      <div className="tiny muted">One fix per kind of failure, most serious first. Nothing is applied to your files.</div>
       {(out.fixes || []).map((x) => <FixCard key={x.id} x={x} f={byId[x.id]} />)}
       {!(out.fixes || []).length && <div className="empty">No failure points, so nothing to fix.</div>}
       {out.fallback_reason && <div className="tiny muted">AI fixes not available: {plainText(out.fallback_reason)}</div>}

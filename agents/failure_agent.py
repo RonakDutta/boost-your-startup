@@ -184,7 +184,8 @@ class FailureSimulatorAgent:
             dropped = len([p for p in result.papers if p.title]) - len(relevant)
             if not relevant:
                 notes.append(f"No paper that names '{info['title'].lower()}' was found; nothing was invented in its place.")
-                groups.append({"type": kind, "title": info["title"], "queries": info["queries"], "papers": [], "dropped": dropped})
+                groups.append({"type": kind, "title": info["title"], "queries": info["queries"], "papers": [],
+                               "relevant": 0, "dropped": dropped})
                 continue
             vectors, similarity_backend = embed_texts([info["topic"]] + [f"{p.title}. {p.abstract[:1500]}" for p in relevant])
             sims = (vectors[1:] @ vectors[0]).tolist()
@@ -198,7 +199,8 @@ class FailureSimulatorAgent:
                     "abstract": p.abstract[:900], "key_sentence": key_sentence(p.abstract, info["topic"]),
                     "ieee": ieee_reference(p, n),
                 })
-            groups.append({"type": kind, "title": info["title"], "queries": info["queries"], "papers": papers, "dropped": dropped})
+            groups.append({"type": kind, "title": info["title"], "queries": info["queries"], "papers": papers,
+                           "relevant": len(relevant), "dropped": dropped})
         if similarity_backend == "TF-IDF":
             notes.append("Papers were ranked with TF-IDF word overlap (the MiniLM model was not available).")
         names = {"arxiv": "arXiv", "semantic_scholar": "Semantic Scholar", "openalex": "OpenAlex"}
