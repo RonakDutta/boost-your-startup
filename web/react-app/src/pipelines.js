@@ -29,6 +29,19 @@ export const CODE_PIPELINE = {
   ],
 }
 
+export const FAILURE_PIPELINE = {
+  rows: 2,
+  nodes: [
+    { id: 'index', label: 'Parse code', sub: 'AST, no AI', agents: ['Code Structure Indexer'], col: 0, row: 0, deps: [] },
+    { id: 'scan', label: 'Find failure points', sub: '11 checks, CWE', agents: ['Failure Scanner'], col: 1, row: 0, deps: ['index'] },
+    { id: 'spread', label: 'Failure spread', sub: 'Call graph', agents: ['Failure Spread'], col: 2, row: 1, deps: ['scan'] },
+    { id: 'research', label: 'Research papers', sub: 'arXiv · S2 · OpenAlex', agents: ['Failure Research'], col: 2, row: 0, deps: ['scan'], star: true },
+    { id: 'fix', label: 'Suggest fixes', sub: 'AI, 1 call', agents: ['Fix Advisor'], col: 3, row: 0, deps: ['research', 'spread'] },
+    { id: 'critic', label: 'Check fixes', sub: 'Code, no AI', agents: ['Fix Critic'], col: 4, row: 0, deps: ['fix'] },
+    { id: 'report', label: 'Report', sub: 'Read-only', agents: [], col: 5, row: 0, deps: ['critic'], final: true },
+  ],
+}
+
 export const PROTOTYPE_PIPELINE = {
   rows: 2,
   nodes: [

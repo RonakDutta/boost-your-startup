@@ -179,7 +179,13 @@ class OrchestratorAgent:
     def classify(self, state: AgentWorkflowState, force_intent: Optional[str] = None) -> None:
         """Graph node 1: intent classification and plan."""
         # 1. Intent Classification & Task Decomposition
-        if force_intent in ("codebase_analysis", "idea_validation"):
+        if force_intent == "failure_analysis":
+            # Only started from the Failure Simulator tool, never guessed from a question.
+            intent, confidence = force_intent, 1.0
+            plan_steps = ["Index the repository", "Run the failure checks", "Trace how far each failure spreads",
+                          "Find research papers per failure type", "Suggest fixes", "Verify the fixes in code"]
+            state.add_trace("Orchestrator", "Intent explicitly specified as 'failure_analysis'.")
+        elif force_intent in ("codebase_analysis", "idea_validation"):
             intent = force_intent
             confidence = 1.0
             plan_steps = (
@@ -253,6 +259,8 @@ class OrchestratorAgent:
         # 2. Route Execution to Specialized Pipeline
         if intent == "codebase_analysis":
             self._execute_codebase_pipeline(state, state.user_query, state.repo_path)
+        elif intent == "failure_analysis":
+            self._execute_failure_pipeline(state, state.repo_path)
         else:
             self._execute_idea_pipeline(state, state.user_query)
 
@@ -296,10 +304,8 @@ class OrchestratorAgent:
             logger.warning(f"[Orchestrator] Session registration note: {sess_err}")
 
 
-    def _execute_codebase_pipeline(
-        self, state: AgentWorkflowState, query: str, repo_path: Optional[str]
-    ) -> None:
-        """Executes Code Navigation -> Diagnosis -> Critic verification loop."""
+    def _resolve_repo(self, state: AgentWorkflowState, repo_path: Optional[str]) -> str:
+        """Local folder as is, GitHub URL cloned read-only. Returns "" (and sets an error output) when unusable."""
         target_path = (repo_path or "").strip()
         from indexer.github_ingest import github_ingest_service
 
@@ -320,7 +326,7 @@ class OrchestratorAgent:
                     "error": f"Failed to clone GitHub repository: {ingest_res.error_message}",
                     "type": "error",
                 }
-                return
+                return ""
             state.add_trace(
                 "Task Planner",
                 f"Successfully cloned '{ingest_res.repo_name}' ({ingest_res.total_files} files, {ingest_res.total_symbols} symbols).",
@@ -344,6 +350,33 @@ class OrchestratorAgent:
                 "error": "Please provide a valid repository path or public GitHub URL to analyze.",
                 "type": "error",
             }
+            return ""
+        return target_path
+
+
+    def _execute_failure_pipeline(self, state: AgentWorkflowState, repo_path: Optional[str]) -> None:
+        """Failure Simulator: scan -> spread -> research papers -> fixes -> critic (agents/failure_agent.py)."""
+        from agents.failure_agent import failure_simulator
+
+        target_path = self._resolve_repo(state, repo_path)
+        if not target_path:
+            return
+        codebase_index = index_cache.get_index(target_path)
+        state.repo_path = target_path
+        state.add_trace(
+            "Code Structure Indexer",
+            f"Parsed {len(codebase_index.file_list)} Python files ({len(codebase_index.chunks)} functions and classes)",
+            details={"tool": "Python AST parser (no AI)"},
+        )
+        state.final_output = failure_simulator.run(
+            codebase_index, target_path, state, lambda name, fn: self._run_step(state, name, fn))
+
+    def _execute_codebase_pipeline(
+        self, state: AgentWorkflowState, query: str, repo_path: Optional[str]
+    ) -> None:
+        """Executes Code Navigation -> Diagnosis -> Critic verification loop."""
+        target_path = self._resolve_repo(state, repo_path)
+        if not target_path:
             return
 
         # Step 1: AST Parsing & Indexing (cached per repo until a .py file changes)

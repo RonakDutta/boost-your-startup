@@ -52,6 +52,8 @@ HTML_PATH = ROOT_DIR / "web" / "templates" / "index.html"
 # UI=legacy in the environment keeps the old single-file dashboard at /.
 UI_DIST = ROOT_DIR / "web" / "react-app" / "dist"
 SAMPLE_REPO_PATH = ROOT_DIR / "sample_repo"
+# Demo repo for the Failure Simulator: a small made-up startup backend with real failure points.
+SAMPLE_STARTUP_REPO_PATH = ROOT_DIR / "sample_startup_repo"
 
 
 # Every visitor shares one free Groq key, so full pipeline runs are limited per
@@ -91,7 +93,8 @@ def _local_path_allowed(path: str) -> bool:
         return True
     target = os.path.realpath(path)
     allowed = [os.path.realpath(r) for r in roots] + [
-        os.path.realpath(SAMPLE_REPO_PATH), os.path.realpath(prototype_sandbox.PROTOTYPE_DIR),
+        os.path.realpath(SAMPLE_REPO_PATH), os.path.realpath(SAMPLE_STARTUP_REPO_PATH),
+        os.path.realpath(prototype_sandbox.PROTOTYPE_DIR),
     ]
     return any(target == root or target.startswith(root + os.sep) for root in allowed)
 
@@ -436,7 +439,8 @@ def inspect_repository(req: InspectRepoRequest):
 @app.get("/api/sample-repo-path")
 def get_sample_repo_path():
     """Returns the normalized absolute path to the built-in sample demo repository."""
-    return JSONResponse(content={"path": str(SAMPLE_REPO_PATH).replace("\\", "/")})
+    return JSONResponse(content={"path": str(SAMPLE_REPO_PATH).replace("\\", "/"),
+                                 "startup_path": str(SAMPLE_STARTUP_REPO_PATH).replace("\\", "/")})
 
 
 @app.get("/health")

@@ -192,6 +192,7 @@ function Result({ build, onReview }) {
         <div className="row between">
           <h3>Code</h3>
           <div className="row">
+            <button className="btn sm" onClick={() => window.dispatchEvent(new CustomEvent('copilot:failure', { detail: { path: build.path } }))}>Check for failure points</button>
             <button className="btn sm" onClick={() => onReview(build)}>Review with Codebase Evaluation</button>
             <a className="btn sm" href={`/api/prototype/${build.id}/download`}>Download zip</a>
           </div>

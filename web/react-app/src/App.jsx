@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { getJSON, postJSON } from './api.js'
 import { useRun } from './useRun.js'
-import { CODE_PIPELINE, STARTUP_PIPELINE } from './pipelines.js'
+import { CODE_PIPELINE, FAILURE_PIPELINE, STARTUP_PIPELINE } from './pipelines.js'
 import PipelineGraph from './components/PipelineGraph.jsx'
 import RunPanel from './components/RunPanel.jsx'
 import StartupResult from './startup/StartupResult.jsx'
 import CodeResult from './code/CodeResult.jsx'
+import FailureResult from './failure/FailureResult.jsx'
 import { Tag } from './components/ui.jsx'
 import Landing from './Landing.jsx'
 
@@ -19,6 +20,11 @@ const STARTUP_WHY = [
   ['Real papers, real links', 'Papers come live from arXiv, Semantic Scholar and OpenAlex. Every link opens the actual paper.'],
   ['Scores computed in code', 'The rubric and the novelty index are formulas. Same idea, same score, every time.'],
   ['Checked before it is shown', 'Invented citations are removed. The prototype is tested and started before you see it.'],
+]
+const FAILURE_WHY = [
+  ['Checks with a name', 'Every failure point comes from a fixed check tied to a CWE entry, the public list of software weaknesses. The same code gives the same result.'],
+  ['Backed by research', 'Each kind of failure is linked to real papers found live. A paper is shown only if it names that failure.'],
+  ['Fixes are checked', 'A suggested fix must parse, the same check must pass on it, and every citation must point to a paper that was found.'],
 ]
 const CODE_WHY = [
   ['Reads the whole project', 'It parses every file (AST) and builds a call graph, instead of looking at one pasted snippet.'],
@@ -84,6 +90,7 @@ function Header({ pillar, setPillar, theme, setTheme, onHome }) {
         <div className="switch" role="tablist" aria-label="Choose a tool">
           <button className={pillar === 'startup' ? 'on' : ''} onClick={() => setPillar('startup')}>Startup Assistance</button>
           <button className={pillar === 'code' ? 'on' : ''} onClick={() => setPillar('code')}>Codebase Evaluation</button>
+          <button className={pillar === 'failure' ? 'on' : ''} onClick={() => setPillar('failure')}>Failure Simulator</button>
         </div>
         <div className="engine">{status}</div>
         <button className="icon-btn" aria-label="Toggle dark mode" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
@@ -211,10 +218,79 @@ function CodePage() {
   )
 }
 
+function FailurePage() {
+  const [repo, setRepo] = useState('')
+  const [scan, setScan] = useState(null)
+  const { run, start, stop } = useRun()
+  const running = run?.phase === 'running'
+  const isUrl = /^https?:\/\//.test(repo.trim())
+
+  async function inspect(path = repo) {
+    if (!path.trim()) return
+    setScan({ busy: true })
+    try {
+      setScan(await postJSON('/api/inspect-repo', { repo_path: path.trim() }))
+    } catch (err) {
+      setScan({ error: err.message })
+    }
+  }
+  async function useDemo() {
+    const data = await getJSON('/api/sample-repo-path')
+    setRepo(data.startup_path)
+    inspect(data.startup_path)
+  }
+  const go = () => repo.trim() && start({ query: 'Find failure points', repo_path: repo.trim(), force_intent: 'failure_analysis' })
+
+  // "Check for failure points" on a generated prototype fills in this page.
+  useEffect(() => {
+    const onCheck = (e) => { setRepo(e.detail.path); inspect(e.detail.path) }
+    window.addEventListener('copilot:failure', onCheck)
+    return () => window.removeEventListener('copilot:failure', onCheck)
+  })
+
+  return (
+    <div className="stack-lg">
+      {!run && (
+        <div className="hero">
+          <div className="eyebrow accent">Failure Simulator</div>
+          <h1 className="display">Will your code survive launch day?</h1>
+          <p>Upload a Python project. It finds the places where the code is likely to fail, shows what each failure would break, and links every kind of failure to research papers that study it.</p>
+        </div>
+      )}
+      <div className="card composer" style={{ marginTop: run ? 24 : 0 }}>
+        <div className="row" style={{ flexWrap: 'nowrap' }}>
+          <input className="input mono" value={repo} onChange={(e) => { setRepo(e.target.value); setScan(null) }} placeholder="C:/path/to/project  or  https://github.com/owner/repo" />
+          <button className="btn" onClick={() => inspect()} disabled={!repo.trim() || scan?.busy}>{scan?.busy ? (isUrl ? 'Cloning...' : 'Scanning...') : 'Scan'}</button>
+          <button className="btn" onClick={useDemo}>Demo startup repo</button>
+        </div>
+        {scan && !scan.busy && (
+          scan.error
+            ? <div className="small" style={{ color: 'var(--risk)' }}>{scan.error}</div>
+            : <div className="row tiny"><Tag tone="good">{scan.summary?.total_files} files · {scan.summary?.total_chunks} functions and classes</Tag><span className="muted">{scan.is_remote ? `Cloned ${scan.repo_name}` : 'Local folder'}</span></div>
+        )}
+        <div className="composer-foot">
+          <span className="tiny muted">Read-only: nothing in the project is changed or run.</span>
+          <RunButton running={running} onRun={go} onStop={stop} disabled={!repo.trim()} />
+        </div>
+      </div>
+      {!run && (
+        <div className="card pad stack">
+          <div className="row between"><h3>How a run works</h3><span className="tiny muted">Only one step uses AI. The checks, the spread and the paper search are code.</span></div>
+          <PipelineGraph pipeline={FAILURE_PIPELINE} events={[]} phase="idle" />
+        </div>
+      )}
+      {!run && <Why items={FAILURE_WHY} />}
+      {run && <RunPanel run={run} pipeline={FAILURE_PIPELINE} />}
+      {run?.phase === 'error' && <div className="card pad small" style={{ color: 'var(--risk)' }}>{run.error}</div>}
+      {run?.result && <FailureResult run={run} />}
+    </div>
+  )
+}
+
 // "#/app" (or "#/app/code") shows the tools; anything else shows the landing page.
 function readRoute() {
   const hash = window.location.hash
-  return { inApp: hash.startsWith('#/app'), pillar: hash === '#/app/code' ? 'code' : 'startup' }
+  return { inApp: hash.startsWith('#/app'), pillar: hash === '#/app/code' ? 'code' : hash === '#/app/failure' ? 'failure' : 'startup' }
 }
 
 export default function App() {
@@ -226,12 +302,14 @@ export default function App() {
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
-  const enter = (p) => { window.location.hash = p === 'code' ? '#/app/code' : '#/app'; window.scrollTo({ top: 0 }) }
+  const enter = (p) => { window.location.hash = p === 'code' ? '#/app/code' : p === 'failure' ? '#/app/failure' : '#/app'; window.scrollTo({ top: 0 }) }
   const home = () => { window.location.hash = ''; window.scrollTo({ top: 0 }) }
   useEffect(() => {
     const toCode = () => { setPillar('code'); window.scrollTo({ top: 0 }) }
+    const toFailure = () => { setPillar('failure'); window.scrollTo({ top: 0 }) }
     window.addEventListener('copilot:review', toCode)
-    return () => window.removeEventListener('copilot:review', toCode)
+    window.addEventListener('copilot:failure', toFailure)
+    return () => { window.removeEventListener('copilot:review', toCode); window.removeEventListener('copilot:failure', toFailure) }
   }, [])
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -245,6 +323,7 @@ export default function App() {
         {/* Both pages stay mounted so a running review keeps going when you switch. */}
         <div hidden={pillar !== 'startup'}><StartupPage /></div>
         <div hidden={pillar !== 'code'}><CodePage /></div>
+        <div hidden={pillar !== 'failure'}><FailurePage /></div>
         <footer className="foot">
           <span>Every score is computed in code. AI text is labelled, and so are fallbacks.</span>
           <span>Agentic Co-Pilot · B.Tech minor project, GGSIPU USAR</span>

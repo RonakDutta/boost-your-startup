@@ -67,6 +67,8 @@ AGENT_MAX_TOKENS = {
     # The app design (JSON: kind, fields, sample records, rule) is the normal path;
     # "prototype" is only used when no standard app shape fits.
     "prototype_design": 2200,
+    # Failure Simulator: fixes + research notes for up to 5 failure points.
+    "failure_fix": 2600,
     "prototype": 4800,
     "prototype_fix": 4000,
 }
