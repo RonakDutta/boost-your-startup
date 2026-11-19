@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import TraceView from '../components/TraceView.jsx'
 import { Bar, More, SafeLink, Score, Source, Tabs, Tag, plainText } from '../components/ui.jsx'
-import { Columns, FlowGraph, HBars, SplitBar } from '../components/charts.jsx'
+import { Columns, FlowGraph, HBars, SplitBar, yearColumns } from '../components/charts.jsx'
 
 const SEV_TONE = { high: 'risk', medium: 'warn', low: '' }
 const SEV_CHART = { high: 'risk', medium: 'warn', low: 'low' }
@@ -209,11 +209,8 @@ function Points({ out }) {
 function Research({ out }) {
   const groups = out.research || []
   const all = groups.flatMap((g) => g.papers.map((p) => ({ ...p, kind: g.title })))
-  const years = {}
-  for (const p of all) if (p.year) years[p.year] = (years[p.year] || 0) + 1
-  const span = Object.keys(years).map(Number).sort((a, b) => a - b)
-  const yearData = span.length ? Array.from({ length: span[span.length - 1] - span[0] + 1 }, (_, i) => span[0] + i)
-    .map((y) => ({ label: `'${String(y).slice(2)}`, value: years[y] || 0, tip: `${y}: ${years[y] || 0} paper(s)` })) : []
+  const yearData = yearColumns(all)
+  const span = all.map((p) => p.year).filter(Boolean).sort((a, b) => a - b)
   return (
     <div className="stack-lg">
       {all.length > 0 && (

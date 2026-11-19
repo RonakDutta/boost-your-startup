@@ -1,4 +1,5 @@
 import { Bar, More, SafeLink, Source, Tag, downloadText } from '../components/ui.jsx'
+import { Columns, HBars, SplitBar, yearColumns } from '../components/charts.jsx'
 
 const SOURCE_NAMES = { arxiv: 'arXiv', semantic_scholar: 'Semantic Scholar', openalex: 'OpenAlex' }
 const sourceName = (s) => SOURCE_NAMES[s] || s
@@ -161,6 +162,13 @@ function Comparisons({ pa }) {
           </span>
         )}
       </div>
+      <div className="card pad">
+        <div className="small muted" style={{ marginBottom: 8 }}>Overlap with your idea, paper by paper</div>
+        <SplitBar parts={['high', 'medium', 'low'].map((lvl) => ({
+          label: `${lvl[0].toUpperCase()}${lvl.slice(1)} overlap`, value: (pa.comparisons || []).filter((c) => c.overlap_level === lvl).length,
+          tone: lvl === 'high' ? 'risk' : lvl === 'medium' ? 'warn' : 'good',
+        }))} unit=" papers" />
+      </div>
       <div className="grid g2">
         {(pa.comparisons || []).map((c) => (
           <div className="card pad stack" key={c.ref} style={{ gap: 10 }}>
@@ -217,6 +225,20 @@ export default function Papers({ pa, title }) {
         <div className="card pad stack">
           <div className="eyebrow">Where your idea sits</div>
           <SimilarityMap points={pa.similarity_map} papers={papers} />
+        </div>
+      </div>
+      <div className="grid g2">
+        <div className="card pad stack">
+          <div className="row between"><h3>How close each paper is</h3><span className="tiny muted">similarity to your idea ({pa.similarity_backend?.startsWith('MiniLM') ? 'MiniLM' : 'TF-IDF'})</span></div>
+          <HBars labelWidth={250} unit="%" rows={papers.map((p) => ({
+            key: p.ref_id, label: `${p.ref_id} · ${p.title}`, sub: `${p.year || 'n.d.'} · ${sourceName(p.source)}`,
+            value: Math.round(p.similarity * 100), tone: 'info', tip: `${p.ref_id}: ${p.title} (${Math.round(p.similarity * 100)}%)`,
+          }))} />
+        </div>
+        <div className="card pad stack">
+          <div className="row between"><h3>When they were published</h3><span className="tiny muted">is the topic active?</span></div>
+          <Columns data={yearColumns(papers)} height={150} />
+          <div className="tiny muted">{papers.filter((p) => p.year && p.year >= new Date().getFullYear() - 3).length} of {papers.length} papers are from the last 3 years.</div>
         </div>
       </div>
       <div className="stack">

@@ -193,3 +193,13 @@ export function FlowGraph({ columns, edges, onPick }) {
     </div>
   )
 }
+
+/** Papers per publication year, every year in the range (empty years stay visible). */
+export function yearColumns(papers) {
+  const years = {}
+  for (const p of papers) if (p.year) years[p.year] = (years[p.year] || 0) + 1
+  const span = Object.keys(years).map(Number).sort((a, b) => a - b)
+  if (!span.length) return []
+  return Array.from({ length: span[span.length - 1] - span[0] + 1 }, (_, i) => span[0] + i)
+    .map((y) => ({ label: `'${String(y).slice(2)}`, value: years[y] || 0, tip: `${y}: ${years[y] || 0} paper(s)` }))
+}

@@ -152,6 +152,7 @@ PRD (session) → Spec Planner (top 3 requirements, code) → Code Writer (1 AI 
 - `App.jsx`: header (pillar switch, engine status, theme toggle), `StartupPage`, `CodePage`, "Why not just ask a chatbot?" cards. Both pages stay mounted so a run survives switching. `useRun.js`: SSE run state (`useRun(url)`, also used for prototype builds).
 - `api.js`: `streamRun()` (fetch + SSE parser), `getJSON`, `postJSON`.
 - `pipelines.js`: graph definitions matched to trace `agent_name`s; `nodeStates()` derives done / working / fallback from real events and the dependency graph.
+- `components/charts.jsx`: flat charts with a hover readout, theme colours only (works in dark mode): `HBars` (incl. stacked `parts` + `legend`), `SplitBar`, `Columns`, `yearColumns()`, `Timeline`, `FlowGraph` (columns of nodes + edges, hover highlights a path). Used by the Failure Simulator (points split, kinds, files, spread graph, research results, years, fix checks), Research papers tab (similarity per paper, papers per year, overlap split) and Plan tab (roadmap timeline). Follow the dataviz rules: thin bars (14px), 4px rounded ends, 2px gaps in stacks, legend for 2+ series, text never in the data colour, no rings/gauges, details in "Table view".
 - `components/`: `PipelineGraph` (SVG agent graph), `RunPanel` (live graph + step log + AI calls), `TraceView` ("How it ran" tab), `FollowUp`, `ui.jsx` (Tag, Source, Bar, Score, More, Markdown via marked + DOMPurify, Mermaid lazy-loaded with `securityLevel: 'strict'`, `modelName`, `plainText`).
 - `startup/StartupResult.jsx` (tabs: Overview, Research papers, Scorecard, Market, Risks, Plan, Prototype, How it ran), `startup/Prototype.jsx` (live build graph, stats, live preview iframe, monitor polled every 2 s, checks, code viewer, zip, "Review with Codebase Evaluation" via a `copilot:review` window event), `startup/Papers.jsx` (spotlight, novelty, similarity map, paper list, comparisons, gap/positioning, Related Work, BibTeX).
 - `failure/FailureResult.jsx` (tabs: Overview with readiness and CWE table, Failure points with "If it fails" and callers, Research with papers per failure type, Fixes with checks and before/after, How it ran). `FailurePage` lives in `App.jsx`.
@@ -239,6 +240,10 @@ Grounded prompts, deterministic critic with quote-vs-disk and compile checks, ho
 - Checked in Chromium on the demo repo without a key: 12 failure points, 15 live arXiv papers on 5 failure types, standard fixes labelled fallback; no sideways scroll at 390px.
 - Tests: 135 pass (`tests/test_failure.py`: each check fires and its safe version does not, readiness cap, fix check, demo repo end to end with stubbed search, AI fixes checked by the critic, SSE endpoint).
 - **Not yet checked with a real key:** the Fix Advisor's AI fixes and research notes. Run the demo repo on the laptop.
+
+### Phase 10: charts instead of text (same branch)
+- User: "use more graphs, it is a lot of text". Added `components/charts.jsx` and replaced text blocks with charts (see section 5). Tables moved behind "Table view". Checked in Chromium, light and dark, no sideways scroll at 390px.
+- Research results chart shows the relevance filter honestly: per failure kind, results shown / also named the failure / left out (`research[].relevant` added).
 
 ### Measured numbers (real runs, keep updated)
 - Live idea run (Oct 2026, cloud, real key): 7 calls, ~16k tokens, 13 s, no fallbacks; every answer `finish_reason=stop` and used about half its max_tokens. Devil's advocate, Judge and PRD went to gpt-oss-20b because gpt-oss-120b's 8k/minute was used by the parallel steps (by design).

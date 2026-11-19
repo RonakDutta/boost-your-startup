@@ -5,6 +5,7 @@ import { useRun } from '../useRun.js'
 import TraceView from '../components/TraceView.jsx'
 import FollowUp from '../components/FollowUp.jsx'
 import { Bar, Mermaid, More, SafeLink, Score, Source, Tabs, Tag, downloadText, toneFor } from '../components/ui.jsx'
+import { Timeline } from '../components/charts.jsx'
 
 const SEV_TONE = { Critical: 'risk', High: 'risk', Medium: 'warn', Low: '' }
 const SECTION_NAMES = {
@@ -220,11 +221,32 @@ const DIAGRAMS = [
   ['dataflow_diagram_mermaid', 'Data flow'],
 ]
 
+/** "3 weeks", "Weeks 4-6", 2 -> number of weeks. */
+function weeks(d) {
+  const nums = String(d ?? '').match(/\d+/g)?.map(Number) || []
+  if (nums.length >= 2 && /-|to/.test(String(d))) return Math.max(1, nums[1] - nums[0] + 1)
+  return nums[0] || 2
+}
+
 function Plan({ out }) {
   const prd = out.prd || {}
   const [diagram, setDiagram] = useState(DIAGRAMS[0][0])
+  let at = 0
+  const items = (out.phases || []).map((p) => {
+    const length = weeks(p.duration_weeks)
+    const name = String(p.phase_name || '').replace(/^phase\s*\d+\s*[:.-]\s*/i, '')
+    const item = { label: `Phase ${p.phase_number}: ${name}`, sub: `${length} weeks`, start: at, length, tone: 'accent' }
+    at += length
+    return item
+  })
   return (
     <div className="stack-lg">
+      {items.length > 0 && (
+        <div className="card pad stack">
+          <div className="row between"><h3>Roadmap timeline</h3><span className="tiny muted">{at} weeks in total</span></div>
+          <Timeline items={items} />
+        </div>
+      )}
       <div className="grid g3">
         {(out.phases || []).map((p) => (
           <div key={p.phase_number} className="card pad stack" style={{ gap: 8 }}>
