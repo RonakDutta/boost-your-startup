@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import TraceView from '../components/TraceView.jsx'
 import FollowUp from '../components/FollowUp.jsx'
-import { Bar, Mermaid, More, Score, Source, Tabs, Tag, toneFor } from '../components/ui.jsx'
+import { Bar, Mermaid, More, Score, Source, Tabs, Tag, plainText, toneFor } from '../components/ui.jsx'
 
 const MODE = {
   bug: { label: 'Bug report', hint: 'Where the bug probably is, and a fix to review' },
@@ -58,7 +58,7 @@ function Finding({ c, mode }) {
           <Source value={isFallback ? 'fallback' : 'llm'} />
         </div>
       </div>
-      <p style={{ margin: 0, color: 'var(--ink-2)' }}>{c.why_problematic || c.root_cause_hypothesis}</p>
+      <p style={{ margin: 0, color: 'var(--ink-2)' }}>{plainText(c.why_problematic || c.root_cause_hypothesis)}</p>
       <Checks v={c.verification} />
       <div className="grid g2">
         <div className="stack" style={{ gap: 6 }}>
@@ -70,7 +70,7 @@ function Finding({ c, mode }) {
           <CodeBox code={c.recommended_pattern || c.correct_code} start={0} tone="after" />
         </div>
       </div>
-      {c.explanation_of_change && <div className="small"><strong>What changes:</strong> <span className="muted">{c.explanation_of_change}</span></div>}
+      {c.explanation_of_change && <div className="small"><strong>What changes:</strong> <span className="muted">{plainText(c.explanation_of_change)}</span></div>}
     </div>
   )
 }
@@ -113,7 +113,7 @@ function Impact({ out }) {
       </div>
       {im.mermaid_diagram && <div className="card pad stack"><h3>Impact graph</h3><Mermaid chart={im.mermaid_diagram} /></div>}
       {(im.recommendations || []).length > 0 && (
-        <div className="card pad stack"><h3>Before you change it</h3><ul className="list small">{im.recommendations.map((r, i) => <li key={i}>{r}</li>)}</ul></div>
+        <div className="card pad stack"><h3>Before you change it</h3><ul className="list small">{im.recommendations.map((r, i) => <li key={i}>{plainText(r)}</li>)}</ul></div>
       )}
     </div>
   )
@@ -140,7 +140,7 @@ function Overview({ out, state, goTo }) {
         </div>
         <div className="stack">
           <div className="row"><span className="eyebrow accent">{mode.label}</span><span className="tiny muted">{mode.hint}</span></div>
-          <p style={{ margin: 0, fontSize: 18, lineHeight: 1.5 }}>{out.summary}</p>
+          <p style={{ margin: 0, fontSize: 18, lineHeight: 1.5 }}>{plainText(out.summary)}</p>
           <div className="row tiny">
             <Tag>{passed}/{checks.length} checks passed</Tag>
             <Tag>{out.retrieval_backend === 'sentence-transformers' ? 'MiniLM + BM25 search' : 'TF-IDF + BM25 search'}</Tag>
@@ -156,7 +156,7 @@ function Overview({ out, state, goTo }) {
             <>
               <div className="mono" style={{ fontWeight: 600 }}>{top.symbol_name}</div>
               <div className="tiny muted mono">{top.file_path}:{top.line_start}-{top.line_end}</div>
-              <div className="small muted clamp-2">{top.why_problematic || top.root_cause_hypothesis}</div>
+              <div className="small muted clamp-2">{plainText(top.why_problematic || top.root_cause_hypothesis)}</div>
             </>
           ) : <div className="small muted">No location named. See retrieved code below.</div>}
         </button>

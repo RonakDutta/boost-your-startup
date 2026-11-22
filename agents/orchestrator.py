@@ -77,6 +77,12 @@ _IDEA_INTENT_SIGNALS = re.compile(
     re.IGNORECASE,
 )
 
+_PRODUCT_IDEA = re.compile(
+    r"^\s*(?:an?|the|my|our)\b.{0,90}?\b(?:app|application|platform|system|tool|website|service|marketplace|device|"
+    r"product|tracker|finder|store|portal|dashboard)\b", re.IGNORECASE)
+_HARD_CODE_SIGNALS = re.compile(
+    r"traceback|exception|\w+error\b|\bdef \b|\bclass \b|\.py\b|line \d+|stack trace", re.IGNORECASE)
+
 
 def _classify_intent_deterministically(query: str, repo_path: Optional[str]) -> Optional[str]:
     """
@@ -242,6 +248,13 @@ class OrchestratorAgent:
                         intent = "idea_validation"
                         confidence = 0.95
                         plan_steps = list(IDEA_PLAN)
+
+        # Without a repository a code question cannot run. Text that describes a product
+        # ("An AI peer review platform that checks code with AST rules") is an idea.
+        if (intent == "codebase_analysis" and not force_intent and not state.repo_path
+                and _PRODUCT_IDEA.search(state.user_query or "") and not _HARD_CODE_SIGNALS.search(state.user_query or "")):
+            intent, confidence, plan_steps = "idea_validation", 0.9, list(IDEA_PLAN)
+            state.add_trace("Orchestrator", "No repository was given and the text describes a product, so it is checked as an idea.")
 
         state.intent = intent
         state.intent_confidence = confidence
@@ -556,9 +569,13 @@ class OrchestratorAgent:
             if codebase_index.lookup_symbol(sym.split(".")[-1]):
                 target = sym.split(".")[-1]
                 break
-        if target is None and nav_result.candidate_chunks:
-            top = nav_result.candidate_chunks[0]
-            target = top.name.split(".")[-1]
+        if target is None:
+            # First retrieved chunk that is a real function or class (a module-level chunk is named after its file).
+            for chunk in nav_result.candidate_chunks or []:
+                name = (chunk.name or "").split(".")[-1]
+                if name and not (chunk.name or "").endswith(".py") and codebase_index.lookup_symbol(name):
+                    target = name
+                    break
         if not target:
             return {}
         out: Dict[str, Any] = {}

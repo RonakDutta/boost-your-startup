@@ -20,7 +20,7 @@ const SHEET = [
   ['Code search', 'BM25 keywords + MiniLM embeddings'],
   ['Failure checks', '11 fixed checks, each named by its CWE weakness type'],
   ['Research per failure', 'Live paper search; a paper is kept only if it names the failure'],
-  ['Prototype', 'FastAPI + one page, tested with pytest'],
+  ['Prototype', 'FastAPI + one page, tested with pytest; 7 app types (store, booking, tracker, monitor, review, bill split, directory)'],
   ['Runs on', 'One Python server on this computer'],
 ]
 
@@ -80,7 +80,7 @@ const COMPARE = [
   ['Code questions', 'Sees only the snippet you paste', 'Reads the whole project and checks line numbers on disk'],
   ['Prototype', 'Gives code you still have to run', 'Writes it, runs the tests, starts it, watches it'],
   ['Failure points', 'Gives general advice', 'Named checks find them; papers back each kind; every fix is checked'],
-  ['When the AI fails', 'Still answers confidently', 'Falls back to plain code and says so'],
+  ['When the AI fails', 'Still answers confidently', 'Uses built-in code and says so'],
 ]
 
 export default function Landing({ onEnter, theme, setTheme }) {

@@ -15,6 +15,10 @@ const IDEA_EXAMPLES = [
   ['AI code reviewer', 'An automated AI peer review platform for engineering students that checks their lab code submissions for code quality, linting and AST-based standards.'],
   ['Energy spike monitor', 'A low-cost IoT energy auditing system for residential societies that detects abnormal power spikes using ESP32 with CT current sensors and alerts residents.'],
   ['Rubber products store', 'An e-commerce website for a small rubber products manufacturer in Kerala that sells rubber sheets, gaskets, O-rings, hoses and gloves online to workshops and factories, with material and hardness details, minimum order quantities, live stock, bulk discounts, GST and delivery charges by order value.'],
+  ['Tractor booking', 'A tractor booking platform for small farmers in Punjab villages, where farmers book a tractor by the time slot, owners see the day planner and double bookings are refused.'],
+  ['Hostel complaints', 'A complaint tracker for college hostels where students raise electrical, plumbing, Wi-Fi and mess complaints and wardens move each one from open to resolved.'],
+  ['Bill splitter', 'A bill splitting app for flatmates that records shared expenses like groceries, electricity and Wi-Fi, shows who owes whom and settles up with the fewest payments.'],
+  ['Home tutor finder', 'A home tutor finder for parents that lists tutors nearby by subject and area, with fees and star ratings from other parents.'],
 ]
 // Short answers to "a chatbot can do this too, what is different?"
 const STARTUP_WHY = [

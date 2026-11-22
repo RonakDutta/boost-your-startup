@@ -411,7 +411,7 @@ def normalize(design: Dict[str, Any], spec: Dict[str, Any]) -> Dict[str, Any]:
         "entity_plural": plural,
         "action": _label(design.get("action"), f"Add {entity.lower()}", 30),
         "fields": fields,
-        "seed": seed[:12],
+        "seed": seed[:40 if kind == "monitor" else 12],
         "rule": rule,
         "look": pick_look(design, spec, kind),
     }
@@ -500,6 +500,25 @@ def pick_kind(text: str) -> Optional[str]:
     return best if scores[best] else None
 
 
+# MVP features per kind, used by the built-in idea brief when the AI is not available, so the
+# requirements, roadmap and diagrams talk about what the idea does (labelled as built-in).
+KIND_FEATURES = {
+    "monitor": ["Record readings per meter or location", "Flag readings far above the usual level", "Dashboard with alerts per location"],
+    "review": ["Submit work for checking", "Score each submission against fixed checks", "Show which check failed and on which line"],
+    "tracker": ["Raise a request with category and place", "Move each item through its statuses", "Board with open and resolved counts"],
+    "booking": ["Book a resource by day and time slot", "Refuse double bookings", "Day planner with free slots"],
+    "shop": ["Product catalogue with stock and prices", "Cart priced with bulk discount, tax and delivery", "Checkout that reduces stock and records the order"],
+    "split": ["Record shared expenses and who paid", "Balance for every member", "Settle up with the fewest payments"],
+    "listing": ["Directory filtered by category and area", "Star ratings from users", "Top rated list"],
+}
+GENERAL_FEATURES = ["Main user flow from sign up to result", "Records with search and filters", "Dashboard with the key numbers"]
+
+
+def mvp_features_for(text: str) -> List[str]:
+    """Built-in MVP features for an idea text (no AI): by the app kind its words point to."""
+    return list(KIND_FEATURES.get(pick_kind(text) or "", GENERAL_FEATURES))
+
+
 def spec_text(spec: Dict[str, Any]) -> str:
     parts = [spec.get("title", ""), spec.get("problem", ""), spec.get("value", "")]
     parts += [f"{r.get('title', '')} {r.get('description', '')}" for r in spec.get("requirements") or []]
@@ -524,11 +543,13 @@ def default_design(spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             unit, value, label = "", "reading", "Reading"
             base = [40, 35, 52, 45]
         seed = []
-        for d in range(2, 0, -1):
-            for flat, b in zip(flats, base):
-                seed.append({"location": flat, value: round(b * (1 + 0.04 * ((d + len(flat)) % 3 - 1)), 1),
+        wobble = [0.0, 0.05, -0.04, 0.03, -0.06, 0.02, -0.02]  # a normal week, same every run
+        for d in range(7, 0, -1):
+            for k, (flat, b) in enumerate(zip(flats, base)):
+                seed.append({"location": flat, value: round(b * (1 + wobble[(d + k) % 7]), 1),
                              "day": (_today() - timedelta(days=d)).isoformat()})
-        seed.append({"location": "B-204", value: round(base[2] * 2.3, 1), "day": _today().isoformat()})
+        for flat, b, times in zip(flats, base, (1.02, 0.97, 2.3, 1.6)):  # today: B-204 spikes, C-301 runs high
+            seed.append({"location": flat, value: round(b * times, 1), "day": _today().isoformat()})
         design = {"kind": kind, "entity": "Reading", "entity_plural": "Readings", "action": "Add reading",
                   "fields": [{"name": "location", "label": "Flat", "type": "text"},
                              {"name": value, "label": label, "type": "number", "min": 0, "max": 100000},
@@ -547,7 +568,11 @@ def default_design(spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                     {"student": "Aman Verma", "title": "Lab 3: bubble sort",
                      "content": "def sort(a):\n    for i in range(len(a)):\n        for j in range(len(a) - 1):\n            if a[j] > a[j + 1]:\n                a[j], a[j + 1] = a[j + 1], a[j]\n    print(a)\n    return a"},
                     {"student": "Kabir Singh", "title": "Lab 4: file reader",
-                     "content": 'def read(path):\n    """Read a file."""\n    try:\n        return open(path).read()\n    except:\n        return ""'}]
+                     "content": 'def read(path):\n    """Read a file."""\n    try:\n        return open(path).read()\n    except:\n        return ""'},
+                    {"student": "Arjun Nair", "title": "Lab 4: grades",
+                     "content": 'def grade(score):\n    """Letter grade for a score out of 100."""\n    print("grading", score)\n    return "A" if score >= 90 else "B" if score >= 75 else "C" if score >= 60 else "D" if score >= 40 else "F"'},
+                    {"student": "Sneha Kapoor", "title": "Lab 5: average marks",
+                     "content": 'def average(marks):\n    """Average of a list of marks, 0 for an empty list."""\n    if not marks:\n        return 0\n    return sum(marks) / len(marks)'}]
             fields = [{"name": "student", "label": "Student", "type": "text"}, {"name": "title", "label": "Assignment", "type": "text"},
                       {"name": "content", "label": "Code", "type": "long_text"}]
         else:
@@ -559,6 +584,30 @@ def default_design(spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                       {"name": "content", "label": "Text", "type": "long_text"}]
         design = {"kind": kind, "entity": "Submission", "entity_plural": "Submissions", "action": "Check submission",
                   "fields": fields, "seed": seed, "rule": {"text_field": "content", "pass_mark": 70, "checks": checks}}
+    elif kind == "booking" and re.search(r"tractor|farm|agri|harvest|crop", text):
+        tractors, slots = ["Mahindra 575 DI", "Swaraj 744 FE", "Sonalika DI 745"], ["06:00 to 09:00", "09:00 to 12:00", "14:00 to 17:00", "17:00 to 19:00"]
+        rows = [("Gurpreet Singh", "Kotla", 0, 0, 0), ("Harjit Kaur", "Bhadson", 0, 1, 0), ("Balwinder Sandhu", "Kotla", 1, 0, 0),
+                ("Sukhdev Gill", "Rampur", 2, 2, 0), ("Manpreet Dhillon", "Bhadson", 0, 0, 1), ("Jaswant Brar", "Rampur", 1, 3, 1)]
+        design = {"kind": kind, "entity": "Booking", "entity_plural": "Bookings", "action": "Book tractor",
+                  "fields": [{"name": "farmer", "label": "Farmer", "type": "text"}, {"name": "village", "label": "Village", "type": "text"},
+                             {"name": "tractor", "label": "Tractor", "type": "choice", "choices": tractors},
+                             {"name": "day", "label": "Day", "type": "date"},
+                             {"name": "slot", "label": "Time slot", "type": "choice", "choices": slots}],
+                  "seed": [{"farmer": n, "village": v, "tractor": tractors[t], "slot": slots[sl], "day": (_today() + timedelta(days=dd)).isoformat()}
+                           for n, v, t, sl, dd in rows],
+                  "rule": {"resource_field": "tractor", "day_field": "day", "slot_field": "slot"}}
+    elif kind == "booking" and re.search(r"\blab|seminar|hall|court|turf|studio|meeting room", text):
+        rooms, slots = ["Computer Lab 1", "Computer Lab 2", "Seminar Hall"], ["09:00", "11:00", "13:00", "15:00", "17:00"]
+        rows = [("Prof. Anita Rao", "CSE 3rd year", 0, 0, 0), ("Rohan Mehta", "Robotics club", 2, 3, 0), ("Prof. S. Kumar", "ECE 2nd year", 1, 1, 0),
+                ("Kavya Iyer", "Coding club", 0, 4, 0), ("Prof. Anita Rao", "CSE 3rd year", 0, 0, 1)]
+        design = {"kind": kind, "entity": "Booking", "entity_plural": "Bookings", "action": "Book",
+                  "fields": [{"name": "booked_by", "label": "Booked by", "type": "text"}, {"name": "purpose", "label": "For", "type": "text"},
+                             {"name": "room", "label": "Room", "type": "choice", "choices": rooms},
+                             {"name": "day", "label": "Day", "type": "date"},
+                             {"name": "slot", "label": "Slot", "type": "choice", "choices": slots}],
+                  "seed": [{"booked_by": n, "purpose": p, "room": rooms[r], "slot": slots[sl], "day": (_today() + timedelta(days=dd)).isoformat()}
+                           for n, p, r, sl, dd in rows],
+                  "rule": {"resource_field": "room", "day_field": "day", "slot_field": "slot"}}
     elif kind == "booking":
         design = {"kind": kind, "entity": "Booking", "entity_plural": "Bookings", "action": "Book",
                   "fields": [{"name": "name", "label": "Name", "type": "text"},
@@ -605,6 +654,19 @@ def default_design(spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                              {"name": "price", "label": price, "type": "number", "min": 0, "max": 100000}],
                   "seed": [{"name": n, "category": c, "area": a, "price": p, "ratings": r} for n, c, a, p, r in rows],
                   "rule": {"name_field": "name", "category_field": "category"}}
+    elif re.search(r"complaint|hostel|grievance|maintenance|repair request", text):
+        cats = ["Electrical", "Plumbing", "Wi-Fi", "Mess", "Cleaning"]
+        rows = [("Fan not working", 0, "B-214", "Aditya Rao", "open"), ("Tap leaking in washroom", 1, "A-108", "Ishaan Gupta", "in progress"),
+                ("Wi-Fi drops every evening", 2, "C-302", "Meera Pillai", "open"), ("Dal served cold at dinner", 3, "Mess", "Rahul Verma", "resolved"),
+                ("Corridor not cleaned for 3 days", 4, "Floor 2, B block", "Sana Khan", "in progress"),
+                ("Tube light flickering", 0, "A-115", "Vivek Joshi", "resolved"), ("No water in geyser", 1, "C-207", "Nikita Das", "open")]
+        design = {"kind": kind, "entity": "Complaint", "entity_plural": "Complaints", "action": "Raise complaint",
+                  "fields": [{"name": "title", "label": "Complaint", "type": "text"},
+                             {"name": "category", "label": "Category", "type": "choice", "choices": cats},
+                             {"name": "room", "label": "Room or place", "type": "text"},
+                             {"name": "raised_by", "label": "Raised by", "type": "text"}],
+                  "seed": [{"title": t, "category": cats[c], "room": r, "raised_by": n, "status": st} for t, c, r, n, st in rows],
+                  "rule": {"statuses": ["open", "in progress", "resolved"]}}
     else:
         reqs = [r.get("title", "") for r in spec.get("requirements") or [] if r.get("title")]
         design = {"kind": kind, "entity": "Request", "entity_plural": "Requests", "action": "Add request",
@@ -1550,6 +1612,7 @@ _STATS = {
                         ("per_person", f"Each person's share ({d['rule']['currency']})")],
     "listing": lambda d: [("count", d["entity_plural"]), ("reviews", "Reviews"), ("average_rating", "Average rating (out of 5)")],
 }
+_EXTRA_TITLE = {"monitor": "Readings over time", "review": "Results by check", "tracker": "Board", "booking": "Day planner"}
 _SIDE_TITLE = {"monitor": "By {group}", "review": "What we check", "tracker": "By status", "booking": "Free slots",
                "split": "Who owes whom", "listing": "Top rated"}
 
@@ -1612,7 +1675,7 @@ function fillTable(rows) {
   const body = document.getElementById("rows");
   body.replaceChildren();
   if (!rows.length) { const tr = el("tr"); const td = el("td", "Nothing yet.", "empty"); td.colSpan = APP.columns.length; tr.append(td); body.append(tr); }
-  for (const r of rows) {
+  for (const r of showAll ? rows : rows.slice(0, 12)) {
     const tr = el("tr");
     for (const c of APP.columns) {
       const td = el("td");
@@ -1622,12 +1685,20 @@ function fillTable(rows) {
     }
     body.append(tr);
   }
+  if (rows.length > 12 && !showAll) {
+    const tr = el("tr"); const td = el("td"); td.colSpan = APP.columns.length;
+    const more = el("button", "Show all " + rows.length, "btn small"); more.type = "button";
+    more.onclick = () => { showAll = true; fillTable(rows); };
+    td.append(more); tr.append(td); body.append(tr);
+  }
 }
+let showAll = false;
 async function load() {
   const [rows, summary] = await Promise.all([api(APP.list), api("/api/summary")]);
   for (const [key] of APP.stats) document.getElementById("stat-" + key).textContent = summary[key];
   fillTable(rows);
   await side(rows, summary);
+  if (typeof extra === "function") await extra(rows, summary);
 }
 document.getElementById("form").onsubmit = async (e) => {
   e.preventDefault();
@@ -1664,6 +1735,69 @@ async function side() {
   }
 }
 function latestText(r) { return "Saved. Status: " + r.status + " (" + r.note + ")."; }
+let picked = null;
+const TONE_FILL = { normal: "var(--accent)", high: "#bf8700", alert: "#cf222e" };
+async function extra(rows) {
+  const box = document.getElementById("extra");
+  box.replaceChildren();
+  if (!rows.length) { box.append(el("p", "No readings yet.", "muted")); return; }
+  const groups = [...new Set(rows.map((r) => r[APP.group]))].sort();
+  const alerts = rows.filter((r) => r.status === "alert");
+  const strip = el("div", "", "alerts");
+  if (!alerts.length) strip.append(el("p", "No alerts right now.", "muted"));
+  for (const a of alerts.slice(0, 3)) {
+    const item = el("button", "", "alert-item");
+    item.type = "button";
+    item.append(tag("alert"), el("strong", a[APP.group]), el("span", a.note + (APP.date ? ", " + a[APP.date] : ""), "muted"));
+    item.onclick = () => { picked = a[APP.group]; extra(rows); };
+    strip.append(item);
+  }
+  if (!groups.includes(picked)) picked = (alerts[0] || rows[0])[APP.group];
+  const pick = document.createElement("select");
+  for (const g of groups) { const o = el("option", g); o.selected = g === picked; pick.append(o); }
+  pick.onchange = () => { picked = pick.value; extra(rows); };
+  pick.style.width = "auto";
+  const head = el("div", "", "row");
+  head.append(el("span", APP.groupLabel, "muted"), pick);
+  const legend = el("div", "", "row legend");
+  for (const [k, t] of [["normal", "Normal"], ["high", "High"], ["alert", "Alert"]]) {
+    const sw = el("span", "", "swatch"); sw.style.background = TONE_FILL[k]; legend.append(sw, el("span", t, "muted"));
+  }
+  const series = rows.filter((r) => r[APP.group] === picked).reverse();
+  const avg = series.reduce((a, r) => a + r[APP.value], 0) / series.length;
+  const line = el("span", "", "swatch dash"); legend.append(line, el("span", "Average " + Math.round(avg * 10) / 10 + " " + APP.unit, "muted"));
+  box.append(strip, head, chart(series, Math.max(320, box.clientWidth)), legend);
+}
+function chart(series, W) {
+  const H = 220, L = 48, R = 10, T = 14, B = 30, pw = W - L - R, ph = H - T - B;
+  const values = series.map((r) => r[APP.value]);
+  const top = Math.max(1, ...values) * 1.1;
+  const avg = values.reduce((a, b) => a + b, 0) / Math.max(1, values.length);
+  const y = (v) => T + ph - (v / top) * ph;
+  const wrap = el("div", "", "chart");
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  const add = (name, attrs, text) => { const n = document.createElementNS("http://www.w3.org/2000/svg", name); for (const k in attrs) n.setAttribute(k, attrs[k]); if (text !== undefined) n.textContent = text; svg.append(n); return n; };
+  for (const f of [0, 0.5, 1]) {
+    const v = top / 1.1 * f;
+    add("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), class: "grid-line" });
+    add("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end", class: "axis" }, Math.round(v));
+  }
+  const band = pw / Math.max(1, series.length), bw = Math.min(18, band * 0.6), every = Math.ceil(series.length / Math.max(2, Math.floor(pw / 56)));
+  const tip = el("div", "", "tip");
+  series.forEach((r, i) => {
+    const x = L + band * i + (band - bw) / 2, yv = y(r[APP.value]), base = T + ph, rad = Math.min(4, (base - yv) / 2);
+    add("path", { d: `M${x},${base}V${yv + rad}Q${x},${yv} ${x + rad},${yv}H${x + bw - rad}Q${x + bw},${yv} ${x + bw},${yv + rad}V${base}Z`, fill: TONE_FILL[r.status] || TONE_FILL.normal });
+    if (i % every === 0) add("text", { x: x + bw / 2, y: H - 10, "text-anchor": "middle", class: "axis" }, APP.date ? String(r[APP.date]).slice(5) : "#" + r.id);
+    const hit = add("rect", { x: L + band * i, y: T, width: band, height: ph, fill: "transparent" });
+    hit.onmouseenter = () => { tip.textContent = (APP.date ? r[APP.date] + ": " : "") + r[APP.value] + " " + APP.unit + ", " + r.status + " (" + r.note + ")"; tip.style.left = Math.min(70, 100 * (i + 0.5) / series.length) + "%"; tip.hidden = false; };
+    hit.onmouseleave = () => { tip.hidden = true; };
+  });
+  add("line", { x1: L, x2: W - R, y1: y(avg), y2: y(avg), class: "avg-line" });
+  tip.hidden = true;
+  wrap.append(svg, tip);
+  return wrap;
+}
 """,
     "review": r"""
 let rules = null;
@@ -1682,6 +1816,46 @@ async function side(rows) {
   if (latest) box.append(el("p", "Results shown for the newest " + APP.entity.toLowerCase() + ".", "muted"));
 }
 function latestText(r) { return "Checked. Score " + r.score + "/100: " + r.status + "."; }
+let picked = null;
+function who(r) { return APP.who.map((k) => r[k]).filter(Boolean).join(", ") || "#" + r.id; }
+async function extra(rows) {
+  if (!rules) rules = await api("/api/checks");
+  const box = document.getElementById("extra");
+  box.replaceChildren();
+  if (!rows.length) { box.append(el("p", "Nothing submitted yet.", "muted")); return; }
+  const table = el("table", "", "matrix");
+  const head = el("tr");
+  head.append(el("th", APP.entity));
+  for (const c of rules.checks) head.append(el("th", c.label));
+  head.append(el("th", "Score"));
+  table.append(head);
+  if (!rows.some((r) => r.id === picked)) picked = rows[0].id;
+  for (const r of rows) {
+    const tr = el("tr", "", r.id === picked ? "on" : "");
+    tr.append(el("td", who(r)));
+    for (const res of r.results) tr.append(el("td", res.passed ? "pass" : "fail", "cell " + (res.passed ? "good" : "bad")));
+    const score = el("td", "", "score"); score.append(el("strong", String(r.score) + " "), tag(r.status)); tr.append(score);
+    tr.onclick = () => { picked = r.id; extra(rows); };
+    table.append(tr);
+  }
+  const wrap = el("div"); wrap.style.overflowX = "auto"; wrap.append(table);
+  const r = rows.find((x) => x.id === picked);
+  const view = el("div", "", "viewer");
+  view.append(el("h3", who(r) + ": " + r.score + " / 100"));
+  const missing = r.results.filter((x) => !x.passed).map((x) => x.label);
+  view.append(el("p", missing.length ? "Failed: " + missing.join(", ") : "Every check passed.", "muted"));
+  const code = el("div", "", "code");
+  String(r[APP.text]).split("\n").forEach((text, i) => {
+    const issues = rules.checks.filter((c) => (c.kind === "not_contains" && text.toLowerCase().includes(String(c.value).toLowerCase()))
+      || (c.kind === "max_line_length" && text.length > c.value)).map((c) => c.label);
+    const line = el("div", "", "line" + (issues.length ? " flag" : ""));
+    line.append(el("span", String(i + 1), "ln"), el("span", text || " "));
+    if (issues.length) { line.title = issues.join(", "); line.append(el("span", issues.join(", "), "why")); }
+    code.append(line);
+  });
+  view.append(code);
+  box.append(el("p", "Click a row to see its code. Lines that break a check are marked.", "muted"), wrap, view);
+}
 """,
     "tracker": r"""
 async function side(rows, summary) {
@@ -1703,6 +1877,32 @@ function statusPicker(r) {
 }
 APP.columns.push({ label: "Status", cell: statusPicker });
 function latestText(r) { return "Added as " + r.status + "."; }
+async function extra(rows) {
+  const box = document.getElementById("extra");
+  const board = el("div", "", "board");
+  APP.statuses.forEach((s, i) => {
+    const items = rows.filter((r) => r.status === s);
+    const lane = el("div", "", "lane");
+    const head = el("div", "", "row spread lane-head");
+    head.append(tag(s), el("span", String(items.length), "muted"));
+    lane.append(head);
+    if (!items.length) lane.append(el("p", "Nothing here.", "muted"));
+    for (const r of items) {
+      const card = el("div", "", "ticket");
+      card.append(el("strong", r[APP.title]), el("div", [...new Set(APP.meta.map((k) => r[k]).filter(Boolean))].join(" · "), "muted"));
+      const next = APP.statuses[i + 1];
+      if (next) {
+        const b = el("button", "Move to " + next, "btn small");
+        b.type = "button";
+        b.onclick = async () => { await api(APP.list + "/" + r.id, { method: "PATCH", body: JSON.stringify({ status: next }) }); load(); };
+        card.append(b);
+      }
+      lane.append(card);
+    }
+    board.append(lane);
+  });
+  box.replaceChildren(board);
+}
 """,
     "split": r"""
 async function side() {
@@ -1776,8 +1976,43 @@ async function side() {
     row.append(head, slots); box.append(row);
   }
 }
-document.getElementById("form").addEventListener("change", (e) => { if (e.target.name === APP.day) side(); });
+let lastRows = [];
+document.getElementById("form").addEventListener("change", (e) => { if (e.target.name === APP.day) { side(); extra(lastRows); } });
 function latestText(r) { return "Booked. Booking number " + r.id + "."; }
+async function extra(rows) {
+  lastRows = rows;
+  const form = document.getElementById("form");
+  const day = form.elements[APP.day].value;
+  const box = document.getElementById("extra");
+  const table = el("table", "", "planner");
+  const head = el("tr");
+  head.append(el("th", ""));
+  for (const s of APP.slots) head.append(el("th", s));
+  table.append(head);
+  for (const res of APP.resources) {
+    const tr = el("tr");
+    tr.append(el("th", res));
+    for (const s of APP.slots) {
+      const b = rows.find((r) => r[APP.resource] === res && r[APP.slot] === s && r[APP.day] === day);
+      const td = el("td");
+      if (b) td.append(el("span", b[APP.who] || "Booked", "booked"));
+      else {
+        const free = el("button", "Free", "btn small free");
+        free.type = "button";
+        free.onclick = () => {
+          form.elements[APP.resource].value = res; form.elements[APP.slot].value = s;
+          const first = form.querySelector("input[type=text]"); if (first) first.focus();
+          document.getElementById("latest").textContent = res + " at " + s + " picked. Fill in the name and book.";
+        };
+        td.append(free);
+      }
+      tr.append(td);
+    }
+    table.append(tr);
+  }
+  const wrap = el("div"); wrap.style.overflowX = "auto"; wrap.append(table);
+  box.replaceChildren(el("p", "On " + day + ". Pick a free slot to fill the form, or change the day in the form.", "muted"), wrap);
+}
 """,
 }
 
@@ -2147,12 +2382,22 @@ def _page(d: Dict[str, Any]) -> str:
     stats = _STATS[kind](d)
     app = {"list": path, "fields": fields, "columns": columns, "tones": tones, "stats": stats,
            "action": d["action"], "entity": d["entity"]}
+    texts = [f["name"] for f in d["fields"] if f["type"] == "text"]
     if kind == "monitor":
-        app.update(group=rule["group_field"], unit=rule["unit"])
+        app.update(group=rule["group_field"], unit=rule["unit"], value=rule["value_field"],
+                   date=next((f["name"] for f in d["fields"] if f["type"] == "date"), None),
+                   groupLabel=next(f["label"] for f in d["fields"] if f["name"] == rule["group_field"]))
+    if kind == "review":
+        app.update(text=rule["text_field"], who=texts[:2])
     if kind == "tracker":
         app["statuses"] = rule["statuses"]
+        title = texts[0] if texts else d["fields"][0]["name"]
+        app.update(title=title, meta=[f["name"] for f in d["fields"] if f["name"] != title and f["type"] != "long_text"][:3])
     if kind == "booking":
         app["day"] = rule["day_field"]
+        by = {f["name"]: f for f in d["fields"]}
+        app.update(resource=rule["resource_field"], slot=rule["slot_field"], resources=by[rule["resource_field"]]["choices"],
+                   slots=by[rule["slot_field"]]["choices"], who=texts[0] if texts else None)
     if kind == "split":
         app["currency"] = rule["currency"]
     if kind == "listing":
@@ -2170,6 +2415,8 @@ def _page(d: Dict[str, Any]) -> str:
     side_card = f'<div class="card"><h2>{e(side_title)}</h2><div id="side"></div></div>'
     table_card = (f'<div class="card"><h2>{e(d["entity_plural"])}</h2><div style="overflow-x:auto"><table>'
                   f'<thead><tr id="head"></tr></thead><tbody id="rows"></tbody></table></div></div>')
+    # The main view of this kind (chart, results grid, board, day planner), full width above the records.
+    extra_card = f'<div class="card"><h2>{e(_EXTRA_TITLE[kind])}</h2><div id="extra"></div></div>' if kind in _EXTRA_TITLE else ""
     header = (f'<header class="top"><div class="wrap"><span class="brand">{e(d["app_name"])}</span>'
               f'<span class="muted">{e(d["tagline"])}</span></div></header>')
     if look["layout"] == "sidebar":
@@ -2184,6 +2431,7 @@ def _page(d: Dict[str, Any]) -> str:
       <div class="grid">
 {stat_cards}
       </div>
+      {extra_card}
       {table_card}
     </section>
   </div>
@@ -2197,6 +2445,7 @@ def _page(d: Dict[str, Any]) -> str:
 {stat_cards}
   </div>
   {form_card.replace('<form id="form">', '<form id="form" class="form-inline">')}
+  {extra_card}
   <div class="cols">
     {table_card}
     {side_card}
@@ -2212,6 +2461,7 @@ def _page(d: Dict[str, Any]) -> str:
     {form_card}
     {side_card}
   </div>
+  {extra_card}
   {table_card}
 </main>"""
     return f"""<!doctype html>
