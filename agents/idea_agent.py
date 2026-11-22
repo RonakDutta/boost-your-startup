@@ -8,6 +8,7 @@ import re
 from dataclasses import dataclass, asdict
 from typing import Any, Dict, List
 from core.llm import llm_client, AGENT_MAX_TOKENS
+from agents.prototype_blueprints import mvp_features_for
 
 
 _LEAD_RE = re.compile(
@@ -139,11 +140,8 @@ class IdeaDecompositionAgent:
                 # The idea's own first sentence: nothing invented (labelled as a fallback).
                 "core_value_prop": re.split(r"(?<=[.!?])\s", " ".join((raw_idea or "").split()))[0][:200],
                 "key_assumptions": ["Users require automated domain insights.", "System integration points are accessible."],
-                "mvp_features": [
-                    "Core telemetry and ingestion pipeline",
-                    "Automated analysis and reporting engine",
-                    "Interactive dashboard with alert rules"
-                ]
+                # Picked by the kind of app the idea's words point to (booking, shop, monitor...).
+                "mvp_features": mvp_features_for(raw_idea),
             }
 
         trace.append(f"Decomposition complete: Title '{json_output.get('project_title')}' generated.")

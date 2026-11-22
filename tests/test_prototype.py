@@ -452,3 +452,15 @@ def test_monitor_sample_week_builds_and_passes_its_tests():
     assert out["ok"], out["output"]
     code = files["features.py"]
     assert "B-204" in code and "C-301" in code
+
+
+def test_product_idea_that_mentions_code_is_an_idea_without_a_repo():
+    from agents.orchestrator import orchestrator
+    from agents.workflow_state import AgentWorkflowState
+    state = AgentWorkflowState(session_id="t1", user_query="An automated AI peer review platform for engineering students "
+                               "that checks their lab code submissions for code quality, linting and AST-based standards.")
+    orchestrator.classify(state)
+    assert state.intent == "idea_validation"
+    bug = AgentWorkflowState(session_id="t2", user_query="ValueError: Token expired in verify_token, where is the bug?")
+    orchestrator.classify(bug)
+    assert bug.intent == "codebase_analysis"

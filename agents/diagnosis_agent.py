@@ -172,11 +172,11 @@ def _fallback_candidate(rank: int, chunk: CodeChunk, query: str) -> Dict[str, An
         observations.append(f"Known pattern ({kb_hits[0].topic}): {kb_hits[0].text}")
     why = (
         f"'{chunk.name}' was ranked as a likely location by hybrid retrieval for this report. "
-        "No LLM diagnosis was available, so the root cause has not been confirmed. "
+        "No AI diagnosis was available, so the root cause has not been confirmed. "
         + " ".join(observations)
     )
     guidance = (
-        f"# No fix was generated for {chunk.name} (LLM unavailable).\n"
+        f"# No fix was generated for {chunk.name} (AI not available).\n"
         "# Review this function against the reported error:\n"
         + "\n".join(f"#  - {o}" for o in observations)
     )
@@ -286,8 +286,8 @@ class DiagnosisAgent:
             ]
             json_output = {
                 "summary": (
-                    f"LLM diagnosis unavailable. {len(fallback_candidates)} likely locations were ranked by "
-                    f"hybrid retrieval for '{nav_result.query[:60]}'; review them manually."
+                    f"AI diagnosis not available. The {len(fallback_candidates)} most likely locations for your question "
+                    f"were ranked by hybrid search (keywords + embeddings); review them below."
                 ),
                 "candidates": fallback_candidates,
             }

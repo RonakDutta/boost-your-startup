@@ -500,6 +500,25 @@ def pick_kind(text: str) -> Optional[str]:
     return best if scores[best] else None
 
 
+# MVP features per kind, used by the built-in idea brief when the AI is not available, so the
+# requirements, roadmap and diagrams talk about what the idea does (labelled as built-in).
+KIND_FEATURES = {
+    "monitor": ["Record readings per meter or location", "Flag readings far above the usual level", "Dashboard with alerts per location"],
+    "review": ["Submit work for checking", "Score each submission against fixed checks", "Show which check failed and on which line"],
+    "tracker": ["Raise a request with category and place", "Move each item through its statuses", "Board with open and resolved counts"],
+    "booking": ["Book a resource by day and time slot", "Refuse double bookings", "Day planner with free slots"],
+    "shop": ["Product catalogue with stock and prices", "Cart priced with bulk discount, tax and delivery", "Checkout that reduces stock and records the order"],
+    "split": ["Record shared expenses and who paid", "Balance for every member", "Settle up with the fewest payments"],
+    "listing": ["Directory filtered by category and area", "Star ratings from users", "Top rated list"],
+}
+GENERAL_FEATURES = ["Main user flow from sign up to result", "Records with search and filters", "Dashboard with the key numbers"]
+
+
+def mvp_features_for(text: str) -> List[str]:
+    """Built-in MVP features for an idea text (no AI): by the app kind its words point to."""
+    return list(KIND_FEATURES.get(pick_kind(text) or "", GENERAL_FEATURES))
+
+
 def spec_text(spec: Dict[str, Any]) -> str:
     parts = [spec.get("title", ""), spec.get("problem", ""), spec.get("value", "")]
     parts += [f"{r.get('title', '')} {r.get('description', '')}" for r in spec.get("requirements") or []]
