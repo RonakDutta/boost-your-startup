@@ -419,3 +419,36 @@ def test_ensure_never_drops_a_field_the_rule_uses():
     blueprints._ensure(fields, "reading", ("number",), {"name": "reading", "label": "R", "type": "number", "min": 0, "max": 9},
                        keep={group["name"]})
     assert "where" in [f["name"] for f in fields] and len(fields) == 5
+
+
+DEMO_KINDS = {"Smart water meter": "monitor", "AI code reviewer": "review", "Energy spike monitor": "monitor",
+              "Rubber products store": "shop", "Tractor booking": "booking", "Hostel complaints": "tracker",
+              "Bill splitter": "split", "Home tutor finder": "listing"}
+
+
+def test_every_demo_idea_in_the_ui_gets_its_own_app_kind():
+    import re
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1] / "web/react-app/src/App.jsx").read_text(encoding="utf-8")
+    block = src.split("const IDEA_EXAMPLES = [")[1].split("\n]")[0]
+    demos = dict(re.findall(r"\['([^']+)', '([^']+)'\]", block))
+    assert set(demos) == set(DEMO_KINDS)
+    for label, idea in demos.items():
+        d = blueprints.default_design({"title": label, "problem": idea})
+        assert d and d["kind"] == DEMO_KINDS[label], label
+        files = blueprints.render(d)
+        assert prototype_sandbox.safety_check(files) == [] and prototype_sandbox.page_api_check(files) == [], label
+        if d["kind"] in blueprints._EXTRA_TITLE:
+            assert 'id="extra"' in files["static/index.html"], label
+
+
+def test_monitor_sample_week_builds_and_passes_its_tests():
+    d = blueprints.default_design({"title": "W", "problem": "smart water meter that detects pipe leaks"})
+    assert len(d["seed"]) == 32
+    files = blueprints.render(d)
+    from agents.prototype_templates import BASE_CSS, MAIN_PY
+    prototype_sandbox.write_files("abcdef9999", {**files, "main.py": MAIN_PY.format(title="W"), "static/base.css": BASE_CSS})
+    out = prototype_sandbox.run_tests("abcdef9999")
+    assert out["ok"], out["output"]
+    code = files["features.py"]
+    assert "B-204" in code and "C-301" in code

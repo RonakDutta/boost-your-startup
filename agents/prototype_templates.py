@@ -103,7 +103,8 @@ p { margin: 0 0 10px; }
 .muted { color: var(--muted); font-size: 13px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
-.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 16px; }
+.cols > *, .side-layout > *, .grid > * { min-width: 0; }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .stat { font-size: 26px; font-weight: 700; }
 .accent-line { border-top: 3px solid var(--accent); }
@@ -154,6 +155,42 @@ td select { width: auto; min-width: 96px; padding: 4px 6px; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn.wide { width: 100%; }
 .site-foot { color: var(--muted); font-size: 12px; padding-top: 4px; padding-bottom: 28px; }
+/* Main views: readings chart, results grid, board, day planner. */
+.alerts { display: grid; gap: 6px; margin-bottom: 12px; }
+.alert-item { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; text-align: left; font: inherit; font-size: 14px; padding: 8px 10px;
+  border: 1px solid #ffcecb; background: #fff6f5; border-radius: 4px; cursor: pointer; color: var(--text); }
+.chart { position: relative; margin: 10px 0 6px; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart .axis { fill: var(--muted); font-size: 11px; }
+.chart .grid-line { stroke: #eceef1; stroke-width: 1; }
+.chart .avg-line { stroke: var(--text); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.6; }
+.tip { position: absolute; top: 0; transform: translateX(-50%); background: var(--text); color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 4px; white-space: nowrap; pointer-events: none; }
+.legend { gap: 6px 10px; font-size: 13px; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+.swatch.dash { height: 0; width: 16px; border-top: 2px dashed var(--text); opacity: 0.6; border-radius: 0; }
+.matrix { font-size: 13px; }
+.matrix th { font-size: 12px; vertical-align: bottom; }
+.matrix tr { cursor: pointer; }
+.matrix tr.on td { background: var(--soft); }
+.matrix td.cell { text-align: center; font-size: 12px; }
+.matrix td.score { white-space: nowrap; }
+.matrix td.cell.good { color: #116329; }
+.matrix td.cell.bad { color: #a40e26; background: #fff6f5; }
+.viewer { margin-top: 14px; }
+.code { font: 13px/1.6 Consolas, Menlo, monospace; border: 1px solid var(--line); border-radius: 4px; overflow-x: auto; background: #fafbfc; }
+.code .line { display: flex; gap: 12px; padding: 0 10px; white-space: pre; }
+.code .line.flag { background: #fff1f0; }
+.code .ln { color: var(--muted); min-width: 22px; text-align: right; user-select: none; }
+.code .why { margin-left: auto; padding-left: 16px; color: #a40e26; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; font-size: 12px; }
+.board { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.lane { background: var(--soft); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.lane-head { margin-bottom: 2px; }
+.ticket { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 10px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; font-size: 14px; }
+.planner { font-size: 13px; }
+.planner th { white-space: nowrap; }
+.planner td { padding: 4px; }
+.booked { display: block; background: var(--soft); border-left: 3px solid var(--accent); padding: 4px 8px; border-radius: 2px; font-size: 12px; }
+.btn.free { width: 100%; color: #116329; border-style: dashed; }
 /* Layout "store" (shop): catalogue with filters, a cart that is priced on the server, orders. */
 .mark { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; margin-right: 10px; border-radius: 4px;
   background: var(--accent); color: #fff; font-size: 13px; vertical-align: middle; }
