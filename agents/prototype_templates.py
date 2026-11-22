@@ -86,6 +86,7 @@ BASE_CSS = """/* Prototype stylesheet (fixed file). Flat and plain on purpose; c
 [data-theme="green"] { --accent: #15803d; --bg: #f3f8f4; --soft: #e0efe3; }
 [data-theme="rose"] { --accent: #be123c; --bg: #faf5f6; --soft: #f5e1e6; }
 [data-theme="slate"] { --accent: #334155; --bg: #f4f5f7; --soft: #e3e7ec; --radius: 2px; }
+[data-theme="orange"] { --accent: #c2410c; --bg: #f8f6f4; --soft: #f3e6dc; }
 * { box-sizing: border-box; }
 body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: var(--text); background: var(--bg); }
 .top { background: var(--card); border-bottom: 1px solid var(--line); }
@@ -140,13 +141,74 @@ th { color: var(--muted); font-weight: 600; font-size: 13px; }
 .form-inline { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: end; }
 .form-inline .field { margin-bottom: 0; }
 .form-inline .field:has(textarea) { grid-column: 1 / -1; }
+h3 { font-size: 14px; margin: 14px 0 6px; }
+.spread { justify-content: space-between; }
+.bar.neg > span { background: #cf222e; }
+.stars { white-space: nowrap; }
+.stars b { color: #b45309; font-weight: 400; }
+.stars i { color: #d0d4d9; font-style: normal; }
+tbody tr:hover { background: var(--soft); }
+td select { width: auto; min-width: 96px; padding: 4px 6px; }
+.ok { color: #116329; font-size: 13px; }
+.save { color: #116329; font-size: 12px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.wide { width: 100%; }
+.site-foot { color: var(--muted); font-size: 12px; padding-top: 4px; padding-bottom: 28px; }
+/* Layout "store" (shop): catalogue with filters, a cart that is priced on the server, orders. */
+.mark { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; margin-right: 10px; border-radius: 4px;
+  background: var(--accent); color: #fff; font-size: 13px; vertical-align: middle; }
+[data-header="accent"] .mark { background: #fff; color: var(--accent); }
+.store-top .wrap { flex-wrap: nowrap; }
+.store-top input[type="search"] { flex: 1; max-width: 440px; }
+[data-header="dark"] .store-top input, [data-header="accent"] .store-top input { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.28); color: #fff; }
+[data-header="dark"] .store-top input::placeholder, [data-header="accent"] .store-top input::placeholder { color: rgba(255, 255, 255, 0.7); }
+.cart-btn { white-space: nowrap; text-decoration: none; color: var(--text); }
+.hero { background: var(--soft); border-bottom: 1px solid var(--line); padding: 26px 0; }
+.hero .wrap { display: grid; grid-template-columns: 1fr 1.6fr; gap: 24px; align-items: center; }
+.hero h1 { font-size: 26px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.fact { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; font-size: 13px; }
+.fact b { display: block; color: var(--accent); font-size: 12px; }
+.stats { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.stats .card { border-top: 3px solid var(--accent); }
+.store { display: grid; grid-template-columns: 1fr 340px; gap: 16px; align-items: start; margin-bottom: 16px; }
+.store > * { min-width: 0; }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 12px; overflow-x: auto; }
+.tabs button { font: inherit; font-size: 14px; background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; cursor: pointer; color: var(--muted); white-space: nowrap; }
+.tabs button.on { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+.filters { margin-bottom: 12px; }
+.filters select { width: auto; padding: 6px 8px; font-size: 14px; }
+.filters .count { margin-left: auto; }
+.products { display: grid; grid-template-columns: repeat(auto-fill, minmax(205px, 1fr)); gap: 14px; }
+.product { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden; }
+.product:hover { border-color: var(--accent); }
+.thumb { background: var(--soft); height: 124px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--line); }
+.thumb svg { width: 156px; height: 104px; }
+.thumb .acc { fill: var(--accent); }
+.thumb .hl { fill: none; stroke: #fff; opacity: 0.3; }
+.p-body { padding: 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.p-body h3 { font-size: 15px; margin: 0; line-height: 1.35; }
+.price strong { font-size: 20px; }
+.buy { margin-top: auto; padding-top: 6px; display: grid; grid-template-columns: 74px 1fr; gap: 8px; }
+.qty { width: 74px; padding: 6px 8px; }
+.cart { position: sticky; top: 12px; border-top: 3px solid var(--accent); }
+.cart-line { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; padding: 10px 0; border-bottom: 1px solid #eceef1; font-size: 14px; }
+.cart-line .row { grid-column: 1 / -1; }
+.cart-line .amount { text-align: right; }
+#totals { padding: 8px 0; }
+.total-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 14px; }
+.total-row.save { font-size: 14px; }
+.total-row.grand { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 8px; font-weight: 700; font-size: 18px; }
+@media (max-width: 860px) { .store, .hero .wrap { grid-template-columns: 1fr; } .cart { position: static; } .store-top .wrap { flex-wrap: wrap; } }
+@media (max-width: 480px) { .store-top input[type="search"] { order: 3; flex-basis: 100%; max-width: none; } .products { grid-template-columns: 1fr 1fr; gap: 10px; } .thumb { height: 96px; } .thumb svg { width: 120px; height: 80px; }
+  .buy { grid-template-columns: 1fr; } .qty { width: 100%; } .p-body { padding: 10px; } .price strong { font-size: 17px; } .filters .count { margin-left: 0; } }
 @media (max-width: 760px) { .side-layout { grid-template-columns: 1fr; } }
 """
 
 # Classes the AI is told it may use (kept next to the stylesheet so they agree).
 CSS_CLASSES = (
     "top, wrap, brand, card, grid, row, stat, field, btn, btn primary, btn small, "
-    "muted, list, tag, tag good, tag warn, tag bad, empty, error, cols, list-row, bar, accent-line; plain table/th/td"
+    "muted, list, tag, tag good, tag warn, tag bad, empty, error, cols, list-row, bar, accent-line, spread, ok; plain table/th/td"
 )
 
 README = """# {title}
@@ -179,7 +241,7 @@ def fallback_files(spec: Dict[str, Any]) -> Dict[str, str]:
         "problem": spec.get("problem", ""),
         "users": spec.get("personas", [])[:3],
     }
-    features = f'''"""MVP planner API (built-in fallback prototype, written by code, not by AI)."""
+    features = f'''"""MVP planner API (built-in starter app, written by code, not by AI)."""
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException

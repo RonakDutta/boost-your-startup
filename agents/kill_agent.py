@@ -244,7 +244,7 @@ class KillAgent:
                 max_tokens=AGENT_MAX_TOKENS["kill"],
             )
         except Exception as err:
-            trace.append(f"Kill Agent LLM note ({err}). Using structured adversarial stress-test fallback.")
+            trace.append(f"Kill Agent LLM note ({err}). Using the built-in stress test.")
             generation_source, fallback_reason = "fallback", f"LLM unavailable: {err}"
             res = {}
 
@@ -351,7 +351,7 @@ class ReconcilerAgent:
                 max_tokens=AGENT_MAX_TOKENS["reconcile"],
             )
         except Exception as err:
-            trace.append(f"Reconciler LLM note ({err}). Using structured dialectical synthesis fallback.")
+            trace.append(f"Reconciler LLM note ({err}). Using the built-in synthesis.")
             generation_source, fallback_reason = "fallback", f"LLM unavailable: {err}"
             res = {}
 

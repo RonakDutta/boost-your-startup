@@ -248,7 +248,7 @@ class PRDAgent:
                 max_tokens=AGENT_MAX_TOKENS["prd"],
             )
         except Exception as err:
-            trace.append(f"PRD LLM note ({err}). Using structured MetaGPT specification fallback.")
+            trace.append(f"PRD LLM note ({err}). Using the built-in MetaGPT-style specification.")
             generation_source, fallback_reason = "fallback", f"LLM unavailable: {err}"
             res = {}
 

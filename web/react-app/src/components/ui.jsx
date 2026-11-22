@@ -7,7 +7,7 @@ export function Tag({ tone = '', children, title }) {
   return <span className={`tag ${tone}`} title={title}>{children}</span>
 }
 
-/** Where a section came from: AI, built-in fallback, or computed in code. */
+/** Where a section came from: AI, built-in (no AI), or computed in code. */
 export function Source({ value }) {
   const tone = value === 'llm' ? 'info' : value === 'fallback' ? 'warn' : 'good'
   return <Tag tone={tone}>{SOURCE_LABEL[value] || value}</Tag>
@@ -180,4 +180,7 @@ export function plainText(text) {
     .replace(/free[- ]tier/gi, 'shared')
     .replace(/\(LLM unavailable\)/g, '(AI not available)')
     .replace(/\bLLMs?\b/g, 'AI')
+    .replace(/\bbuilt-in fallbacks?\b/gi, 'built-in version')
+    .replace(/\bfallbacks\b/gi, 'built-in versions')
+    .replace(/\bfallback\b/gi, 'built-in version')
 }

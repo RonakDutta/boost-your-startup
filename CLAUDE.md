@@ -22,7 +22,8 @@ The user's goal: **impress teachers in a viva**. The teachers care mostly about 
 
 **Honesty**
 - Never add hard-coded "results", fake citations, invented papers or invented fixes. Benchmarks compute what they print; report bad numbers as they are.
-- Anything from a fallback is labelled (`generation_source: "fallback"`, trace `status="warning"`). Scores are computed in code, and the UI says so.
+- Anything not written by the AI is labelled (`generation_source: "fallback"`, trace `status="warning"`). Scores are computed in code, and the UI says so.
+- **Never show the word "fallback" to a user** (user, Nov 2026): not in the UI, trace text, reports, generated prototype files or README prose. Say "built-in version", "built-in (no AI)" or "built-in starter app". The internal keys and values (`generation_source: "fallback"`, `fallback_reason`, `used_fallback`) stay as the data contract; `plainText()` in `ui.jsx` also rewrites the word as a safety net.
 
 **The research-paper check is the headline feature.** Keep it prominent in every UI: closest paper with links (page / PDF / DOI), every matched paper with links, novelty index, similarity map, "where the paper is stronger" vs "what your idea adds", Related Work + BibTeX.
 
@@ -43,7 +44,7 @@ The user's goal: **impress teachers in a viva**. The teachers care mostly about 
 ```bash
 pip install -r requirements.txt
 python app.py                                   # http://127.0.0.1:8000  (new UI at /, old UI at /legacy)
-GROQ_API_KEY= pytest -q                         # 141 pass, 3 live smoke tests skip without a key
+GROQ_API_KEY= pytest -q                         # 144 pass, 3 live smoke tests skip without a key
 python evaluation/compare_baseline.py           # naive vs AST chunking (computed)
 python evaluation/retrieval_benchmark.py        # BM25 / vector / hybrid Top-1, Top-3, MRR
 python evaluation/free_tier_budget.py           # token plan vs the model limits (no quota used)
@@ -77,7 +78,8 @@ Idea brief ─┬─ Market search (web) ── Devil's advocate ── Judge �
 ```
 
 ### Prototype Builder (`agents/prototype_agent.py` + `agents/prototype_blueprints.py` + `tools/prototype_sandbox.py`)
-**Normal path (Phase 8):** the AI makes ONE small JSON "app design" call (`DESIGN_PROMPT`, ~2.2k max tokens): kind (`monitor` readings per group with spike/threshold flags, `review` text/code scored against checks, `tracker` statuses, `booking` slots with no double booking), fields, 3-12 sample records and the rule. `blueprints.normalize()` cleans it (field names, limits, conflicting checks, double-booked seeds) and `blueprints.render()` generates features.py, index.html and test_features.py (7-9 tests that pass by construction). No Code Fixer call is needed. AI down → `default_design()` picks a kind from keywords in the idea (the 3 demo ideas: water meter and energy → monitor, AI code reviewer → review), labelled fallback. AI answers `"kind": "custom"` → the old full-code path below. **The UI never says "template"**: files show "Generated for this idea" (`written_by: generated`), main.py shows "Base server file" (user's choice, Nov 2026).
+**Normal path (Phase 8):** the AI makes ONE small JSON "app design" call (`DESIGN_PROMPT`, ~2.6k max tokens): kind (`monitor` readings per group with spike/threshold flags, `review` text/code scored against checks, `tracker` statuses, `booking` slots with no double booking, `shop` online store, `split` shared costs with balances and settle-up, `listing` directory with 1-5 star ratings), fields (shop up to 8), 3-12 sample records and the rule. `blueprints.normalize()` cleans it (field names, limits, conflicting checks, double-booked seeds) and `blueprints.render()` generates features.py, index.html and test_features.py (7-9 tests that pass by construction). No Code Fixer call is needed. AI down → `default_design()` picks a kind from keywords in the idea (the 4 demo ideas: water meter and energy → monitor, AI code reviewer → review, rubber products store → shop), labelled as built-in.
+- **Shop (Phase 14):** its own storefront page (`_shop_page`, layout `store`): category tabs, filters for every other choice field, search, sort, product cards with drawn SVG pictures (shape picked from product words: ring, wheel, hose, glove, belt, mat, sheet, shirt, book, device, bottle, bag, box), a cart priced on the server (`POST /api/quote`: bulk discount per product, then GST/tax, then delivery with a free-over threshold), checkout with name + 6-digit pincode (`POST /api/orders`, stock goes down, minimum order and overselling refused), recent orders, a seller form, and 2 sample orders placed by the real code. Rule: name/category/price/stock fields, optional `unit_field` and `moq_field`, currency, tax_percent, bulk tiers (each needs more units and a bigger discount), delivery_fee, free_delivery_over, low_stock_at. Records route is always `/api/products`. Without the AI, `_default_shop()` has sample catalogues for rubber products (material, Shore A hardness, unit, minimum order), clothing, food and spices, phone accessories, books and stationery, and a general store. Works for any store when the AI is on. AI answers `"kind": "custom"` → the old full-code path below. **The UI never says "template"**: files show "Generated for this idea" (`written_by: generated`), main.py shows "Base server file" (user's choice, Nov 2026).
 
 Full-code path (only for "custom"):
 ```
@@ -266,6 +268,15 @@ Grounded prompts, deterministic critic with quote-vs-disk and compile checks, ho
 - Landing page: students are Ronak Dutta and Vishal Dev (project sheet and footer).
 - Checked in Chromium: light, dark, 390px; tab bar lands at the header line after a switch; tool switch restores scroll. Tests: 138 pass.
 
+### Phase 14: e-commerce prototype + more app kinds (branch `claude/laughing-hypatia-d6rxdv`)
+- New demo idea "Rubber products store" in Startup Assistance (`IDEA_EXAMPLES` in `App.jsx`).
+- Prototype Builder: 3 new app kinds (`shop`, `split`, `listing`), see section 4. Shop has its own storefront page; split and listing use the generic page with their own side panels. Generated tests: shop 10-11 (exact quote numbers, stock goes down, overselling 409, minimum order 422, bad pincode 422), split 9 (balances sum to 0, settle-up clears them, payer must be a member), listing 9 (rating average, bad stars 422, unknown 404, category filter).
+- New theme `orange` (rubber, crafts, spices). Fixed: `_ensure` could drop a field the rule already used when a design had 5 fields; "books" matched the booking keyword "book"; app names were cut mid-word at 40 characters; money in prototypes shows 2 decimals when not whole.
+- Fallback idea title keeps who it is for ("E-commerce Website for Rubber Products Manufacturer" instead of "E-commerce Website for a Small"); the fallback value line is now the idea's own first sentence instead of a generic made-up line.
+- "Fallback" wording removed from everything a user sees (see section 2); `retrieval_backend` value `tfidf-fallback` renamed `tfidf`.
+- Checked in Chromium: rubber idea end to end in the app (idea run, prototype 11/11 tests, 4/4 endpoints, preview), checkout click-through (200 m hose: 10% bulk, GST 18%, free delivery, stock 1500 to 1300), 390px with no sideways scroll, no "fallback" text on any screen of the three tools. Tests: 144 pass.
+- **Not yet checked with a real key:** the AI's shop design for the rubber idea (product names, prices, whether it fills unit/moq fields).
+
 ### Measured numbers (real runs, keep updated)
 - Live idea run (Oct 2026, cloud, real key): 7 calls, ~16k tokens, 13 s, no fallbacks; every answer `finish_reason=stop` and used about half its max_tokens. Devil's advocate, Judge and PRD went to gpt-oss-20b because gpt-oss-120b's 8k/minute was used by the parallel steps (by design).
 - Code runs on `sample_repo`: 1 call, ~2.5k tokens, 3-13 s.
@@ -282,7 +293,7 @@ Grounded prompts, deterministic critic with quote-vs-disk and compile checks, ho
 **Direction (user, Nov 2026): less tech, more research.** Do not add heavy tooling (live fault injection, sandboxes, new infra). Prefer features that show research: papers, CWE, citations checked against abstracts. Gemini as a backup model provider was discussed and postponed by the user ("we will take on gemini later").
 
 **Must fix / verify next (in this order)**
-- **Live check of all three demo ideas** (one prototype checked live in Phase 5): run the three demo ideas, then build a prototype for each. Check the generated page looks right, tests pass, the Code Fixer works when needed, and the monitor counts clicks in the preview. Record pass rate, tokens and build time under "Measured numbers" (real numbers only).
+- **Live check of all four demo ideas** (one prototype checked live in Phase 5): run the four demo ideas, then build a prototype for each. Check the generated page looks right, tests pass, the Code Fixer works when needed, and the monitor counts clicks in the preview. Record pass rate, tokens and build time under "Measured numbers" (real numbers only).
 - Market search sometimes fell back with the user's 10 s timeout. Likely fixed by the timeout floor (Phase 7); confirm on the laptop.
 - Follow-up chat in the new UI was not tested against a live answer yet; check Markdown rendering, `@agent` routing and the error state.
 - Mermaid "dark" theme not yet checked with a live (non-fallback) PRD.

@@ -66,7 +66,7 @@ AGENT_MAX_TOKENS = {
     # still fits one model's 8k-per-minute window.
     # The app design (JSON: kind, fields, sample records, rule) is the normal path;
     # "prototype" is only used when no standard app shape fits.
-    "prototype_design": 2200,
+    "prototype_design": 2600,  # a shop design lists up to 10 products with 8 fields
     # Failure Simulator: fixes + research notes for up to 5 failure points.
     "failure_fix": 2600,
     "prototype": 4800,

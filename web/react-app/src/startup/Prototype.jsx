@@ -4,7 +4,7 @@ import { PROTOTYPE_PIPELINE } from '../pipelines.js'
 import RunPanel from '../components/RunPanel.jsx'
 import { More, Tag, plainText, seconds } from '../components/ui.jsx'
 
-const BY = { ai: ['Written by AI', 'info'], generated: ['Generated for this idea', 'info'], fallback: ['Built-in fallback', 'warn'], template: ['Base server file', ''] }
+const BY = { ai: ['Written by AI', 'info'], generated: ['Generated for this idea', 'info'], fallback: ['Built-in starter', 'warn'], template: ['Base server file', ''] }
 const RANK = { 'must have': 0, 'should have': 1, 'nice to have': 2 }
 
 function planned(out) {
@@ -150,15 +150,15 @@ function Result({ build, onReview }) {
       <div className="grid g4">
         <div className="card stat"><div className="value">{tests.passed ?? 0}<small>/ {tests.total ?? 0}</small></div><div className="label">Tests passed</div></div>
         <div className="card stat"><div className="value">{answered}<small>/ {called.length}</small></div><div className="label">Endpoints answered</div></div>
-        <div className="card stat"><div className="value">{aiFiles.reduce((n, f) => n + f.lines, 0)}</div><div className="label">Lines {build.generation_source === 'llm' ? 'generated' : 'from the fallback'}</div></div>
+        <div className="card stat"><div className="value">{aiFiles.reduce((n, f) => n + f.lines, 0)}</div><div className="label">Lines {build.generation_source === 'llm' ? 'generated' : 'built in'}</div></div>
         <div className="card stat"><div className="value">{c.server?.ok ? 'Yes' : 'No'}</div><div className="label">App started</div></div>
       </div>
 
       <div className="row tiny">
-        <Tag tone={build.generation_source === 'llm' ? 'info' : 'warn'}>{build.generation_source !== 'llm' ? 'Built-in fallback prototype' : build.build_mode === 'design' ? 'Code generated from your idea' : 'Code written by AI'}</Tag>
+        <Tag tone={build.generation_source === 'llm' ? 'info' : 'warn'}>{build.generation_source !== 'llm' ? 'Built-in starter app' : build.build_mode === 'design' ? 'Code generated from your idea' : 'Code written by AI'}</Tag>
         {build.repaired && <Tag tone="accent">AI fixed its own code once after a failed check</Tag>}
         <Tag>Generated prototype, not a finished product</Tag>
-        {build.fallback_reason && <span className="muted">Why the fallback: {plainText(build.fallback_reason)}</span>}
+        {build.fallback_reason && <span className="muted">Why: {plainText(build.fallback_reason)}</span>}
       </div>
 
       <Monitor build={build} />
