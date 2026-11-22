@@ -46,7 +46,7 @@ export default function RunPanel({ run, pipeline, hidden }) {
               <span className="log-time">{seconds(item.e.elapsed_ms)}</span>
               <span>
                 <strong style={{ fontWeight: 600 }}>{item.e.agent_name}</strong> <span className="muted">{plainText(item.e.action)}</span>
-                {item.e.status === 'warning' && <span className="state warn"> (fallback)</span>}
+                {item.e.status === 'warning' && <span className="state warn"> (built-in)</span>}
               </span>
             </div>
           ) : (

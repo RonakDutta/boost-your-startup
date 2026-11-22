@@ -7,7 +7,7 @@ const COL = 178
 const ROW = 80
 const PAD = 14
 
-const STATE_TEXT = { waiting: 'waiting', running: 'working now', done: 'done', fallback: 'fallback used', skipped: 'not needed', notrun: 'not run' }
+const STATE_TEXT = { waiting: 'waiting', running: 'working now', done: 'done', fallback: 'built-in version', skipped: 'not needed', notrun: 'not run' }
 
 export default function PipelineGraph({ pipeline, events, phase, hidden = [] }) {
   const nodes = pipeline.nodes.filter((n) => !hidden.includes(n.id))

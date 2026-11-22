@@ -469,7 +469,7 @@ class FeasibilityScorecardEngine:
                 max_score=10,
                 criteria_met=rk_criteria,
                 gaps=rk_gaps,
-                rationale="Evaluates fallback strategies, failure containment, and operational contingencies.",
+                rationale="Evaluates backup plans, failure containment, and operational contingencies.",
             )
         )
 
@@ -512,7 +512,7 @@ class FeasibilityScorecardEngine:
             if obj is not None and getattr(obj, "generation_source", "llm") == "fallback"
         ]
         if fallback_parts:
-            confidence_notes.append(f"Built-in fallback text was used for: {', '.join(fallback_parts)}")
+            confidence_notes.append(f"Built-in text (no AI) was used for: {', '.join(fallback_parts)}")
         if not live_citations:
             confidence_notes.append("No live web search results were available")
         if not fallback_parts and len(live_citations) >= 2:
@@ -561,7 +561,7 @@ class FeasibilityScorecardEngine:
         else:
             actions.append("Re-examine core technical assumptions and distribution viability.")
         if evidence_confidence == "Low":
-            actions.append("Re-run the analysis when the Groq API and web search are reachable; this score rests on fallback data.")
+            actions.append("Re-run the analysis when the AI engine and web search are reachable; this score rests on built-in text.")
 
         return FeasibilityScorecard(
             project_title=decomposed.project_title,

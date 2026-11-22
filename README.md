@@ -78,7 +78,7 @@ Measured by `python evaluation/compare_baseline.py` on this repository: **91% of
 
 ### 2. Hybrid Retrieval (BM25 + Vectors, Reciprocal Rank Fusion)
 * BM25 with a code-aware tokenizer (`jwtAuthService` -> `jwt`, `auth`, `service`).
-* Dense vectors from `all-MiniLM-L6-v2` (loaded once per process), with a TF-IDF fallback for offline machines.
+* Dense vectors from `all-MiniLM-L6-v2` (loaded once per process), with TF-IDF on machines without the model.
 * Exact symbol mentions are matched as whole identifiers, so short names like `get` or `id` do not match everything.
 * `python evaluation/retrieval_benchmark.py` scores BM25, vector and hybrid retrieval (Top-1, Top-3, MRR) on 18 plain-English questions about this codebase. With MiniLM: BM25 MRR 0.640 (Top-3 72%), vectors 0.672 (78%), hybrid RRF 0.647 with the best Top-3 (83%). Hybrid wins on Top-3 but not on Top-1, and we report it that way.
 
@@ -105,12 +105,12 @@ A transparent 100-point rubric across 7 categories (Problem Validation 20, Marke
 * Only **live** web search results count as citations; offline references and model knowledge do not.
 * Resource Requirements reads the actual stack and idea (hardware, paid managed services, number of layers, feature count).
 * The verdict cannot contradict the Reconciler: a GO is capped at PIVOT when the Reconciler finds high rejection risk.
-* Every scorecard carries an **evidence confidence** (High / Medium / Low) that drops when fallbacks were used or no live search was reachable.
+* Every scorecard carries an **evidence confidence** (High / Medium / Low) that drops when built-in text was used or no live search was reachable.
 
 ### 6. Research Prior-Art Check (Related Work, computed)
 Every idea is checked against published research, live:
 * **Search:** arXiv, Semantic Scholar and OpenAlex in parallel, deduplicated by title (`tools/paper_search.py`). No key is needed; results are cached for 7 days.
-* **Rerank:** `all-MiniLM-L6-v2` embeddings of the idea and each paper's title and abstract (TF-IDF fallback).
+* **Rerank:** `all-MiniLM-L6-v2` embeddings of the idea and each paper's title and abstract (TF-IDF when the model is not installed).
 * **Novelty index:** `100 x (1 - (0.6 x closest similarity + 0.4 x mean of the top 3))`, computed in code, with the similarity backend and evidence confidence shown. The scorecard's Defensibility category loses points when very close papers exist.
 * **Head-to-head comparison:** one LLM call reads only the abstracts and says, per paper, what it does, the overlap, **where the paper is stronger**, and what the idea adds, then writes a research gap, positioning and an IEEE-style Related Work paragraph.
 * **Critic:** comparisons that cite a paper that was not retrieved are dropped, out-of-range `[n]` citations are removed, and each claim's word overlap with the paper's own abstract is reported.
@@ -123,7 +123,7 @@ User stories, prioritized functional requirements, non-functional requirements, 
 From the PRD's top requirements, one AI call writes a tiny FastAPI app with one web page and its tests. Code then checks it before anything runs (import allowlist, no `eval`/`exec`/`open`, no outside scripts), compiles it, runs `pytest`, lets the AI fix it once using the real error output, starts it on `127.0.0.1` and calls every GET endpoint. The Prototype tab shows a live preview and a monitor (requests, errors, response time) read from the app's own log. It never writes into your projects; prototypes live in `~/.agentic-copilot/prototypes/` (outside the project, so the auto-reloading server does not restart when one is written) and stop by themselves after 20 minutes. If the AI cannot produce safe, compiling code, a labelled built-in prototype is used instead.
 
 ### 9. Honest Provenance on Every Section
-Each agent output records `generation_source` (`llm` or `fallback`) and a reason. The final report includes a `provenance` map, `used_fallback`, the web search backend used and the number of live citations. Trace steps that used a fallback are marked `warning`. A step that crashes is re-run on its own built-in fallback, so one bad model reply never fails the whole run.
+Each agent output records `generation_source` (`llm` or `fallback`) and a reason. The final report includes a `provenance` map, `used_fallback`, the web search backend used and the number of live citations. Trace steps that used built-in text are marked `warning`. A step that crashes is re-run on its own built-in version, so one bad model reply never fails the whole run.
 
 ### 10. Explicit LangGraph State Graph
 `agents/graph.py` compiles a real LangGraph `StateGraph` whose nodes run the orchestrator's actual steps: `classify -> (codebase_pipeline | idea_pipeline) -> finalize`, with a conditional edge on the classified intent. `GET /api/graph` reports the active backend and `POST /api/graph/run` returns the nodes visited. Without `langgraph` installed, the same steps run in sequence.

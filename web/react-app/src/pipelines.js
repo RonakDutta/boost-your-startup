@@ -78,4 +78,4 @@ export function nodeStates(pipeline, events, phase) {
   return out
 }
 
-export const SOURCE_LABEL = { llm: 'AI', fallback: 'Built-in fallback', deterministic: 'Computed in code' }
+export const SOURCE_LABEL = { llm: 'AI', fallback: 'Built-in (no AI)', deterministic: 'Computed in code' }

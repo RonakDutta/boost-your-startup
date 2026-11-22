@@ -46,7 +46,7 @@ export default function TraceView({ state, calls }) {
                     {[...(d.findings || []), ...(d.rubric || []), ...(d.papers || []), ...(d.notes || [])].map((f, i) => <li key={i}>{plainText(String(f))}</li>)}
                   </ul>
                   {d.tool && <div className="tiny muted" style={{ marginTop: 6 }}>Tool: {plainText(d.tool)}</div>}
-                  {d.fallback_reason && <div className="tiny" style={{ color: 'var(--warn)', marginTop: 4 }}>Fallback: {plainText(d.fallback_reason)}</div>}
+                  {d.fallback_reason && <div className="tiny" style={{ color: 'var(--warn)', marginTop: 4 }}>Note: {plainText(d.fallback_reason)}</div>}
                 </More>
               )}
             </div>

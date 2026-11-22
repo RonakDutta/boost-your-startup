@@ -80,7 +80,7 @@ class VectorCodeIndex:
                 max_features=5000,
             )
             self._tfidf_matrix = self._tfidf_vectorizer.fit_transform(corpus_texts)
-            self.backend = "tfidf-fallback"
+            self.backend = "tfidf"
             logger.info("[VectorIndex] Loaded local TF-IDF semantic vectorizer.")
 
     def _chunk_to_text(self, chunk: CodeChunk) -> str:
@@ -114,7 +114,7 @@ class VectorCodeIndex:
                 query_embed = query_embed / norm
             scores = np.dot(self.embeddings, query_embed)
             
-        elif self.backend == "tfidf-fallback":
+        elif self.backend == "tfidf":
             from sklearn.metrics.pairwise import cosine_similarity
             q_vec = self._tfidf_vectorizer.transform([query])
             sims = cosine_similarity(self._tfidf_matrix, q_vec).flatten()

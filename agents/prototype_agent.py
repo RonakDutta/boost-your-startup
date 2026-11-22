@@ -433,7 +433,7 @@ class PrototypeBuilderAgent:
         return files, source, fallback_reason, repaired, ok, checks
 
     def _finish(self, proto_id, spec, files, source, fallback_reason, repaired, checks, state, mode, design):
-        all_files = {**files, **self._template_files(spec, "generated" if source == "llm" else "built-in fallback")}
+        all_files = {**files, **self._template_files(spec, "generated" if source == "llm" else "built-in (no AI)")}
         sandbox.write_files(proto_id, all_files)
         tests = checks.get("tests") or {}
 

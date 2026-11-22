@@ -626,7 +626,7 @@ class OrchestratorAgent:
             logger.exception(f"[Orchestrator] {step_name} crashed; re-running on its built-in fallback.")
             state.add_trace(
                 step_name,
-                f"Step error ({type(err).__name__}: {err}). Re-running with built-in fallback.",
+                f"Step error ({type(err).__name__}: {err}). Re-running with the built-in version.",
                 status="warning",
             )
             with self.llm.force_offline():
@@ -671,7 +671,7 @@ class OrchestratorAgent:
             evidence_count=len(decomposed.target_personas),
             details={
                 "thinking": "Analyzed problem domain, segmented core personas, and established lean MVP scope.",
-                "tool": "Groq LLM (structured JSON)" if decomposed.generation_source == "llm" else "Built-in fallback brief",
+                "tool": "Groq LLM (structured JSON)" if decomposed.generation_source == "llm" else "Built-in brief (no AI)",
                 "findings": [
                     f"Project Title: {decomposed.project_title}",
                     f"Core Problem: {decomposed.problem_statement[:120]}...",
@@ -740,7 +740,7 @@ class OrchestratorAgent:
                 evidence_count=len(kill_report.fatal_flaws),
                 details={
                     "thinking": "Challenged unproven assumptions, modeled incumbent replication risks, and located distribution traps.",
-                    "tool": "Groq LLM (adversarial persona)" if kill_report.generation_source == "llm" else "Built-in fallback critique",
+                    "tool": "Groq LLM (adversarial persona)" if kill_report.generation_source == "llm" else "Built-in critique (no AI)",
                     "findings": [
                         f"Bear Case: {kill_report.bear_case_summary[:120]}...",
                         f"Fatal Flaws: {', '.join([f.title for f in kill_report.fatal_flaws[:2]])}",
@@ -928,7 +928,7 @@ class OrchestratorAgent:
             details={
                 # No "thinking"/"findings" here: the legacy storyboard shows the
                 # Report Compiler step for this stage instead.
-                "tool": "Groq LLM (structured JSON)" if roadmap.generation_source == "llm" else "Built-in fallback roadmap",
+                "tool": "Groq LLM (structured JSON)" if roadmap.generation_source == "llm" else "Built-in roadmap (no AI)",
                 "phases": [f"{p.phase_name} ({p.duration_weeks})" for p in roadmap.phases] or ["No phases produced"],
                 "parallel": True,
                 **self._source_note(roadmap),

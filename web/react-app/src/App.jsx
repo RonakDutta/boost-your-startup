@@ -14,6 +14,7 @@ const IDEA_EXAMPLES = [
   ['Smart water meter', 'A smart ultrasonic water meter for residential buildings using LoRaWAN to detect pipe leakages in real time and estimate daily household consumption.'],
   ['AI code reviewer', 'An automated AI peer review platform for engineering students that checks their lab code submissions for code quality, linting and AST-based standards.'],
   ['Energy spike monitor', 'A low-cost IoT energy auditing system for residential societies that detects abnormal power spikes using ESP32 with CT current sensors and alerts residents.'],
+  ['Rubber products store', 'An e-commerce website for a small rubber products manufacturer in Kerala that sells rubber sheets, gaskets, O-rings, hoses and gloves online to workshops and factories, with material and hardness details, minimum order quantities, live stock, bulk discounts, GST and delivery charges by order value.'],
 ]
 // Short answers to "a chatbot can do this too, what is different?"
 const STARTUP_WHY = [
@@ -79,8 +80,8 @@ function EngineToast() {
   }, [])
   let note = null
   if (health === false) note = ['offline', 'risk', 'The server is not reachable. Start it with python app.py.']
-  else if (health && !health.metrics?.llm_configured) note = ['fallback', 'warn', 'The AI engine is off. Steps that need it use built-in fallbacks, and the results say so.']
-  else if (health?.rate_limits?.all_rate_limited) note = ['busy', 'warn', 'The AI engine is busy. A run may wait a little or use labelled fallbacks.']
+  else if (health && !health.metrics?.llm_configured) note = ['fallback', 'warn', 'The AI engine is off. Steps that need it use built-in versions, and the results say so.']
+  else if (health?.rate_limits?.all_rate_limited) note = ['busy', 'warn', 'The AI engine is busy. A run may wait a little or use labelled built-in versions.']
   if (!note || closed === note[0]) return null
   const close = () => { setClosed(note[0]); try { sessionStorage.setItem('copilot-toast', note[0]) } catch { /* private mode */ } }
   return (
@@ -368,7 +369,7 @@ export default function App() {
         <div hidden={pillar !== 'code'}><CodePage /></div>
         <div hidden={pillar !== 'failure'}><FailurePage /></div>
         <footer className="foot">
-          <span>Every score is computed in code. AI text is labelled, and so are fallbacks.</span>
+          <span>Every score is computed in code. AI text is labelled, and so is built-in text.</span>
           <span>Boost Your Startup · B.Tech minor project, USAR, GGSIPU</span>
         </footer>
       </main>

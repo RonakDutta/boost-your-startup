@@ -282,6 +282,8 @@ def test_fallback_idea_title_is_readable():
     assert fallback_title("A mobile app that helps college students split shared grocery bills") == "Split Shared Grocery Bills"
     assert fallback_title("A low-cost IoT energy auditing system for societies") == "Low-cost IoT Energy Auditing System"
     assert fallback_title("") == "Engineering Project"
+    assert fallback_title("An e-commerce website for a small rubber products manufacturer in Kerala that sells sheets") == \
+        "E-commerce Website for Rubber Products Manufacturer"
 
 
 def test_unreadable_answer_is_written_once_more_and_saved(monkeypatch):
@@ -349,6 +351,11 @@ def test_ai_down_builds_a_labelled_app_from_the_idea_keywords(monkeypatch):
     ("A low-cost IoT energy auditing system for residential societies that detects abnormal power spikes using "
      "ESP32 with CT current sensors and alerts residents.", "monitor"),
     ("Hostel students raise complaints and track their status", "tracker"),
+    ("An e-commerce website for a small rubber products manufacturer in Kerala that sells rubber sheets, gaskets, "
+     "O-rings, hoses and gloves online to workshops and factories, with material and hardness details, minimum order "
+     "quantities, live stock, bulk discounts, GST and delivery charges by order value.", "shop"),
+    ("Flatmates split shared grocery bills and see who owes whom", "split"),
+    ("Parents find a home tutor nearby and read ratings from other parents", "listing"),
 ])
 def test_demo_ideas_get_a_working_app_without_ai(idea, kind):
     design = blueprints.default_design({"title": "Demo", "problem": idea})
@@ -374,3 +381,41 @@ def test_messy_designs_are_cleaned_or_rejected():
     assert [c["kind"] for c in d["rule"]["checks"]] == ["contains"]  # opposite and unknown checks dropped
     assert d["fields"][0]["name"] == "status_value" and any(f["type"] == "long_text" for f in d["fields"])
     assert len(d["seed"]) >= 3
+
+
+def test_rubber_shop_design_has_every_pricing_factor():
+    idea = "An e-commerce website for a rubber products manufacturer selling gaskets, hoses and sheets with bulk discounts and GST"
+    d = blueprints.default_design({"title": "Rubber Mart", "problem": idea})
+    rule = d["rule"]
+    assert d["kind"] == "shop" and d["look"]["layout"] == "store"
+    assert rule["moq_field"] and rule["unit_field"] and rule["tax_percent"] == 18 and len(rule["bulk"]) == 2
+    assert {f["name"] for f in d["fields"]} >= {"material", "hardness", "price", "stock", "min_order"}
+    page = blueprints.render(d)["static/index.html"]
+    assert "/api/quote" in page and "/api/orders" in page and "Place order" in page
+
+
+def test_messy_shop_and_split_designs_are_cleaned():
+    spec = {"title": "T"}
+    shop = blueprints.normalize({"kind": "shop", "fields": [{"name": "item", "type": "text"}, {"name": "cost", "type": "number"}],
+                                 "rule": {"price_field": "cost", "bulk": [{"min_qty": 50, "off_percent": 10},
+                                                                          {"min_qty": 20, "off_percent": 20},  # fewer units: dropped
+                                                                          {"min_qty": 100, "off_percent": 5}]},  # smaller discount: dropped
+                                 "seed": [{"item": "Pen", "cost": 10, "stock": 0, "category": "Standard"}]}, spec)
+    rule = shop["rule"]
+    assert rule["price_field"] == "cost" and rule["stock_field"] != "cost" and rule["bulk"] == [{"min_qty": 50, "off_percent": 10}]
+    stock = rule["stock_field"]
+    assert any(row[stock] >= 1 for row in shop["seed"])  # at least one product can be ordered
+    files = blueprints.render(shop)
+    assert prototype_sandbox.safety_check(files) == [] and prototype_sandbox.page_api_check(files) == []
+    split = blueprints.normalize({"kind": "split", "fields": [{"name": "what", "type": "text"}, {"name": "payer", "type": "text"},
+                                                             {"name": "amount", "type": "number"}],
+                                  "rule": {"payer_field": "payer", "amount_field": "amount", "members": ["Asha", "Ravi", "Asha"]}}, spec)
+    assert split["rule"]["payer_field"] == "payer" and split["rule"]["members"] == ["Asha", "Ravi"]
+
+
+def test_ensure_never_drops_a_field_the_rule_uses():
+    fields = [{"name": f"f{i}", "label": "x", "type": "text"} for i in range(4)] + [{"name": "where", "label": "Where", "type": "text"}]
+    group = blueprints._ensure(fields, "where", ("text",), {"name": "location", "label": "L", "type": "text"})
+    blueprints._ensure(fields, "reading", ("number",), {"name": "reading", "label": "R", "type": "number", "min": 0, "max": 9},
+                       keep={group["name"]})
+    assert "where" in [f["name"] for f in fields] and len(fields) == 5

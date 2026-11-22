@@ -30,6 +30,21 @@ def fallback_title(raw_idea: str) -> str:
     while words and words[0].lower() in _SMALL_WORDS | {"students", "users", "people", "college"}:
         words.pop(0)
     picked = words[:5]
+    lower = [w.lower() for w in words]
+    if "for" in lower[1:4]:  # short head + who it is for: "E-commerce Website for Rubber Products Manufacturer"
+        cut = lower.index("for", 1)
+        tail = []
+        for w in words[cut + 1:]:
+            if w.lower() in ("that", "which", "who", "with", "in", "to", "using", "where", "by"):
+                break
+            if w.lower() == "and" and tail:
+                tail.append(w)
+            elif w.lower() not in _SMALL_WORDS | {"small", "local", "new"}:
+                tail.append(w)
+            if len([t for t in tail if t.lower() != "and"]) == 3:
+                break
+        if tail:
+            picked = words[:cut] + ["for"] + tail
     while picked and picked[-1].lower() in _SMALL_WORDS:
         picked.pop()
     if not picked:
@@ -112,7 +127,7 @@ class IdeaDecompositionAgent:
                 max_tokens=AGENT_MAX_TOKENS["idea"],
             )
         except Exception as err:
-            trace.append(f"LLM decomposition note ({err}). Using structured fallback brief.")
+            trace.append(f"LLM decomposition note ({err}). Using the built-in brief.")
             generation_source, fallback_reason = "fallback", f"LLM unavailable: {err}"
             clean_title = fallback_title(raw_idea)
             json_output = {
@@ -121,7 +136,8 @@ class IdeaDecompositionAgent:
                 "target_personas": [
                     {"persona": "Primary User", "pain_point": "Inefficient workflows and lack of automation."}
                 ],
-                "core_value_prop": "Streamlines operational bottlenecks with structured automated validation.",
+                # The idea's own first sentence: nothing invented (labelled as a fallback).
+                "core_value_prop": re.split(r"(?<=[.!?])\s", " ".join((raw_idea or "").split()))[0][:200],
                 "key_assumptions": ["Users require automated domain insights.", "System integration points are accessible."],
                 "mvp_features": [
                     "Core telemetry and ingestion pipeline",
